@@ -1,34 +1,13 @@
-// src/app/api/admin/users/route.ts
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import { cookies } from 'next/headers';
-
-const getUsersPath = () => path.join(process.cwd(), 'data', 'users.json');
-
-const getUsers = () => {
-    try {
-        return JSON.parse(fs.readFileSync(getUsersPath(), 'utf-8'));
-    } catch (error) {
-        console.error('Error reading users:', error);
-        return [];
-    }
-};
-
-const saveUsers = (users: any[]) => {
-    try {
-        fs.writeFileSync(getUsersPath(), JSON.stringify(users, null, 2));
-        return true;
-    } catch (error) {
-        console.error('Error saving users:', error);
-        return false;
-    }
-};
+import dbConnect from '@/lib/mongodb';
+import User from '@/models/User';
 
 // Get all users (admin only)
 export async function GET() {
     try {
         const cookieStore = await cookies();
+        const username = cookieStore.get('user')?.value;
         const isAdmin = cookieStore.get('isAdmin')?.value === 'true';
 
         if (!isAdmin) {
@@ -38,13 +17,15 @@ export async function GET() {
             );
         }
 
-        const users = getUsers();
+        await dbConnect();
+        const users = await User.find({}).select('-__v');
 
         return NextResponse.json({
             success: true,
             users
         });
     } catch (error) {
+        console.error('Error in /api/admin/users (GET):', error);
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
@@ -65,7 +46,7 @@ export async function POST(request: Request) {
             );
         }
 
-        const { username, isAdmin: newUserIsAdmin } = await request.json();
+        const { username } = await request.json();
 
         if (!username) {
             return NextResponse.json(
@@ -74,10 +55,11 @@ export async function POST(request: Request) {
             );
         }
 
-        const users = getUsers();
+        await dbConnect();
 
         // Check if username already exists
-        if (users.some((u: any) => u.username === username)) {
+        const existingUser = await User.findOne({ username });
+        if (existingUser) {
             return NextResponse.json(
                 { success: false, error: 'Username already exists' },
                 { status: 400 }
@@ -85,21 +67,15 @@ export async function POST(request: Request) {
         }
 
         // Add new user
-        users.push({
+        await User.create({
             username,
             password: null, // Will be set on first login
-            isAdmin: !!newUserIsAdmin // Convert to boolean
+            isAdmin: false  // Regular user by default
         });
 
-        if (saveUsers(users)) {
-            return NextResponse.json({ success: true });
-        } else {
-            return NextResponse.json(
-                { success: false, error: 'Could not save user' },
-                { status: 500 }
-            );
-        }
+        return NextResponse.json({ success: true });
     } catch (error) {
+        console.error('Error in /api/admin/users (POST):', error);
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
@@ -111,8 +87,8 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
     try {
         const cookieStore = await cookies();
-        const isAdmin = cookieStore.get('isAdmin')?.value === 'true';
         const currentUsername = cookieStore.get('user')?.value;
+        const isAdmin = cookieStore.get('isAdmin')?.value === 'true';
 
         if (!isAdmin) {
             return NextResponse.json(
@@ -121,8 +97,8 @@ export async function DELETE(request: Request) {
             );
         }
 
-        const url = new URL(request.url);
-        const username = url.searchParams.get('username');
+        const { searchParams } = new URL(request.url);
+        const username = searchParams.get('username');
 
         if (!username) {
             return NextResponse.json(
@@ -139,26 +115,32 @@ export async function DELETE(request: Request) {
             );
         }
 
-        const users = getUsers();
+        await dbConnect();
 
-        const updatedUsers = users.filter((u: any) => u.username !== username);
+        // Find the user to check if they're an admin
+        const user = await User.findOne({ username });
 
-        if (updatedUsers.length === users.length) {
+        if (!user) {
             return NextResponse.json(
                 { success: false, error: 'User not found' },
                 { status: 404 }
             );
         }
 
-        if (saveUsers(updatedUsers)) {
-            return NextResponse.json({ success: true });
-        } else {
+        // Prevent deleting admin accounts
+        if (user.isAdmin) {
             return NextResponse.json(
-                { success: false, error: 'Could not delete user' },
-                { status: 500 }
+                { success: false, error: 'Cannot delete admin accounts' },
+                { status: 400 }
             );
         }
+
+        // Delete the user
+        await User.deleteOne({ username });
+
+        return NextResponse.json({ success: true });
     } catch (error) {
+        console.error('Error in /api/admin/users (DELETE):', error);
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

@@ -1,44 +1,8 @@
-// src/app/api/announcements/route.ts
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import { cookies } from 'next/headers';
+import dbConnect from '@/lib/mongodb';
+import Announcement from '@/models/Announcement';
 
-const getAnnouncementPath = () => path.join(process.cwd(), 'data', 'announcement.json');
-
-const getAnnouncement = () => {
-    try {
-        // Make sure the data directory exists
-        const dataDir = path.join(process.cwd(), 'data');
-        if (!fs.existsSync(dataDir)) {
-            fs.mkdirSync(dataDir);
-        }
-
-        // Check if the announcement file exists
-        if (!fs.existsSync(getAnnouncementPath())) {
-            // Create an empty announcement file
-            fs.writeFileSync(getAnnouncementPath(), JSON.stringify({ text: '' }));
-            return { text: '' };
-        }
-
-        return JSON.parse(fs.readFileSync(getAnnouncementPath(), 'utf-8'));
-    } catch (error) {
-        console.error('Error reading announcement:', error);
-        return { text: '' };
-    }
-};
-
-const saveAnnouncement = (text: string) => {
-    try {
-        fs.writeFileSync(getAnnouncementPath(), JSON.stringify({ text }));
-        return true;
-    } catch (error) {
-        console.error('Error saving announcement:', error);
-        return false;
-    }
-};
-
-// Update announcement (admin only)
 export async function POST(request: Request) {
     try {
         const cookieStore = await cookies();
@@ -51,17 +15,25 @@ export async function POST(request: Request) {
             );
         }
 
-        const { announcement } = await request.json();
+        const { text, color } = await request.json();
 
-        if (saveAnnouncement(announcement)) {
-            return NextResponse.json({ success: true });
-        } else {
-            return NextResponse.json(
-                { success: false, error: 'Could not save announcement' },
-                { status: 500 }
-            );
+        await dbConnect();
+
+        // Deactivate all existing announcements
+        await Announcement.updateMany({}, { isActive: false });
+
+        // Create new announcement
+        if (text) {
+            await Announcement.create({
+                text,
+                color: color || 'yellow',
+                isActive: true
+            });
         }
+
+        return NextResponse.json({ success: true });
     } catch (error) {
+        console.error('Error in /api/announcements:', error);
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

@@ -1,34 +1,24 @@
-// src/app/api/announcements/latest/route.ts
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import dbConnect from '@/lib/mongodb';
+import Announcement from '@/models/Announcement';
 
-const getAnnouncementPath = () => path.join(process.cwd(), 'data', 'announcement.json');
-
-const getAnnouncement = () => {
-    try {
-        // Check if the announcement file exists
-        if (!fs.existsSync(getAnnouncementPath())) {
-            return { text: '' };
-        }
-
-        return JSON.parse(fs.readFileSync(getAnnouncementPath(), 'utf-8'));
-    } catch (error) {
-        console.error('Error reading announcement:', error);
-        return { text: '' };
-    }
-};
-
-// Get latest announcement
 export async function GET() {
     try {
-        const announcement = getAnnouncement();
+        await dbConnect();
+
+        // Get the latest active announcement
+        const announcement = await Announcement.findOne({ isActive: true })
+            .sort({ createdAt: -1 });
 
         return NextResponse.json({
             success: true,
-            announcement: announcement.text
+            announcement: announcement ? {
+                text: announcement.text,
+                color: announcement.color
+            } : { text: '', color: 'yellow' }
         });
     } catch (error) {
+        console.error('Error in /api/announcements/latest:', error);
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

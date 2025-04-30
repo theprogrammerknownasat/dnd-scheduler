@@ -1,4 +1,4 @@
-// src/middleware.ts (updated version)
+// src/middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { updateActiveUser } from './app/api/admin/active-users/route';

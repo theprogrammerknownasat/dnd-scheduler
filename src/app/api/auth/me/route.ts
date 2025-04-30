@@ -1,19 +1,8 @@
 // src/app/api/auth/me/route.ts
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import { cookies } from 'next/headers';
-
-const getUsersPath = () => path.join(process.cwd(), 'data', 'users.json');
-
-const getUsers = () => {
-    try {
-        return JSON.parse(fs.readFileSync(getUsersPath(), 'utf-8'));
-    } catch (error) {
-        console.error('Error reading users:', error);
-        return [];
-    }
-};
+import dbConnect from '@/lib/mongodb';
+import User from '@/models/User';
 
 export async function GET() {
     try {
@@ -28,8 +17,8 @@ export async function GET() {
             );
         }
 
-        const users = getUsers();
-        const user = users.find((u: any) => u.username === username);
+        await dbConnect();
+        const user = await User.findOne({ username });
 
         if (!user) {
             return NextResponse.json(
@@ -41,9 +30,10 @@ export async function GET() {
         return NextResponse.json({
             success: true,
             username: user.username,
-            isAdmin
+            isAdmin: user.isAdmin
         });
     } catch (error) {
+        console.error('Error in /api/auth/me:', error);
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

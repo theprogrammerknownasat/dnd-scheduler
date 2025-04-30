@@ -1,13 +1,18 @@
-// src/app/api/admin/active-users/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-// In a real app, you'd store active users in a database or Redis
-// For simplicity, we'll use a global variable
+// In a real app, you'd use a database or Redis for this
+// For now, we'll use a global variable
 let activeUsers: Record<string, { lastActive: number }> = {};
 
+// Update active user (called from middleware)
+export function updateActiveUser(username: string) {
+    activeUsers[username] = { lastActive: Date.now() };
+    cleanupInactiveUsers();
+}
+
 // Clean up inactive users (30 minute timeout)
-const cleanupInactiveUsers = () => {
+function cleanupInactiveUsers() {
     const now = Date.now();
     const timeout = 30 * 60 * 1000; // 30 minutes
 
@@ -16,12 +21,6 @@ const cleanupInactiveUsers = () => {
             delete activeUsers[username];
         }
     });
-};
-
-// Update active user
-export function updateActiveUser(username: string) {
-    activeUsers[username] = { lastActive: Date.now() };
-    cleanupInactiveUsers();
 }
 
 export async function GET() {
@@ -43,6 +42,7 @@ export async function GET() {
             activeUsers: Object.keys(activeUsers)
         });
     } catch (error) {
+        console.error('Error in /api/admin/active-users:', error);
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

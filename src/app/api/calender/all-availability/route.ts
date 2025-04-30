@@ -1,27 +1,10 @@
-// src/app/api/calendar/all-availability/route.ts
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import { cookies } from 'next/headers';
+import { parseISO, format } from 'date-fns';
+import dbConnect from '@/lib/mongodb';
+import Availability from '@/models/Availability';
 
-const getAvailabilityPath = () => path.join(process.cwd(), 'data', 'availability.json');
-
-const getAvailability = () => {
-    try {
-        // Check if the availability file exists
-        if (!fs.existsSync(getAvailabilityPath())) {
-            return {};
-        }
-
-        return JSON.parse(fs.readFileSync(getAvailabilityPath(), 'utf-8'));
-    } catch (error) {
-        console.error('Error reading availability:', error);
-        return {};
-    }
-};
-
-// Get all users' availability
-export async function GET() {
+export async function GET(request: Request) {
     try {
         const cookieStore = await cookies();
         const username = cookieStore.get('user')?.value;
@@ -33,13 +16,51 @@ export async function GET() {
             );
         }
 
-        const allAvailability = getAvailability();
+        // Get date range from query params
+        const { searchParams } = new URL(request.url);
+        const startDate = searchParams.get('start');
+        const endDate = searchParams.get('end');
+
+        if (!startDate || !endDate) {
+            return NextResponse.json(
+                { success: false, error: 'Start and end dates are required' },
+                { status: 400 }
+            );
+        }
+
+        await dbConnect();
+
+        // Query all availability records for the date range
+        const startDateObj = parseISO(startDate);
+        const endDateObj = parseISO(endDate);
+
+        const availabilityRecords = await Availability.find({
+            date: {
+                $gte: startDateObj,
+                $lte: endDateObj
+            }
+        });
+
+        // Convert to the expected format
+        const allAvailability: Record<string, Record<string, boolean>> = {};
+
+        availabilityRecords.forEach(record => {
+            if (!allAvailability[record.username]) {
+                allAvailability[record.username] = {};
+            }
+
+            const dateStr = format(record.date, 'yyyy-MM-dd');
+            Object.entries(record.timeSlots.toJSON()).forEach(([hour, isAvailable]) => {
+                allAvailability[record.username][`${dateStr}-${hour}`] = <boolean>isAvailable;
+            });
+        });
 
         return NextResponse.json({
             success: true,
             availability: allAvailability
         });
     } catch (error) {
+        console.error('Error in /api/calendar/all-availability:', error);
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

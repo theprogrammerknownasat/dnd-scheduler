@@ -1,28 +1,22 @@
 // src/app/calendar/page.tsx
 "use client";
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '../components/Header';
-import GroupAvailability from '../components/GroupAvailability';
+import DateCalendar from '../components/DateCalendar';
 import PollComponent from '../components/PollComponent';
-import React from 'react';
+import { format } from 'date-fns';
 
 export default function Calendar() {
     const [username, setUsername] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
-    const [announcement, setAnnouncement] = useState('');
-    const [selectedDay, setSelectedDay] = useState<string | null>(null);
+    const [announcement, setAnnouncement] = useState({ text: '', color: 'yellow' });
+    const [allUsersAvailability, setAllUsersAvailability] = useState<Record<string, Record<string, boolean>>>({});
+    const [maxWeeks, setMaxWeeks] = useState(12); // Default to 12 weeks
+    const [loading, setLoading] = useState(true);
     const router = useRouter();
 
-    // For simplicity, let's create a 7-day calendar with time slots
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const timeSlots = Array.from({ length: 14 }, (_, i) => i + 8); // 8 AM to 9 PM
-
-    // State to track availability
-    const [availability, setAvailability] = useState<Record<string, boolean>>({});
-    const [allUsersAvailability, setAllUsersAvailability] = useState<Record<string, Record<string, boolean>>>({});
-
-    // Fetch user info and availability on component mount
+    // Fetch user info and settings on component mount
     useEffect(() => {
         const fetchUserInfo = async () => {
             try {
@@ -41,16 +35,19 @@ export default function Calendar() {
             }
         };
 
-        const fetchAvailability = async () => {
+        const fetchSettings = async () => {
             try {
-                const response = await fetch('/api/calendar/availability');
+                const response = await fetch('/api/settings');
                 const data = await response.json();
 
-                if (data.success) {
-                    setAvailability(data.availability);
+                if (data.success && data.settings) {
+                    // Set max weeks if available
+                    if (data.settings.maxFutureWeeks) {
+                        setMaxWeeks(data.settings.maxFutureWeeks);
+                    }
                 }
             } catch (err) {
-                console.error('Error fetching availability:', err);
+                console.error('Error fetching settings:', err);
             }
         };
 
@@ -77,169 +74,82 @@ export default function Calendar() {
                 }
             } catch (err) {
                 console.error('Error fetching announcement:', err);
+            } finally {
+                setLoading(false);
             }
         };
 
         fetchUserInfo();
-        fetchAvailability();
+        fetchSettings();
         fetchAllUsersAvailability();
         fetchAnnouncement();
     }, [router]);
 
-    // Handle toggling availability for a time slot
-    const toggleAvailability = async (day: string, time: number) => {
-        const key = `${day}-${time}`;
-        const newAvailability = {
-            ...availability,
-            [key]: !availability[key]
-        };
+    // Handle updating availability
+    const handleAvailabilityChange = async (date: Date, hour: number, isAvailable: boolean) => {
+        const dateStr = format(date, 'yyyy-MM-dd');
 
-        setAvailability(newAvailability);
+        // Update the all users availability local state
+        setAllUsersAvailability(prev => {
+            const newState = { ...prev };
+            if (!newState[username]) {
+                newState[username] = {};
+            }
+            newState[username][`${dateStr}-${hour}`] = isAvailable;
+            return newState;
+        });
+    };
 
-        // Update availability on the server
-        try {
-            await fetch('/api/calendar/availability', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ availability: newAvailability }),
-            });
-        } catch (err) {
-            console.error('Error updating availability:', err);
+    const getAnnouncementClasses = () => {
+        const baseClasses = "border-l-4 p-4 mb-4 rounded";
+
+        switch (announcement.color) {
+            case 'red':
+                return `${baseClasses} bg-red-100 border-red-500 text-red-700 dark:bg-red-900/20 dark:border-red-500 dark:text-red-400`;
+            case 'green':
+                return `${baseClasses} bg-green-100 border-green-500 text-green-700 dark:bg-green-900/20 dark:border-green-500 dark:text-green-400`;
+            case 'blue':
+                return `${baseClasses} bg-blue-100 border-blue-500 text-blue-700 dark:bg-blue-900/20 dark:border-blue-500 dark:text-blue-400`;
+            case 'yellow':
+            default:
+                return `${baseClasses} bg-yellow-100 border-yellow-500 text-yellow-700 dark:bg-yellow-900/20 dark:border-yellow-500 dark:text-yellow-400`;
         }
     };
 
-    // Count how many users are available for a time slot
-    const countAvailableUsers = (day: string, time: number) => {
-        const key = `${day}-${time}`;
-        let count = 0;
-
-        Object.keys(allUsersAvailability).forEach(user => {
-            if (allUsersAvailability[user][key]) {
-                count++;
-            }
-        });
-
-        return count;
-    };
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
+                <div className="flex justify-center items-center h-screen">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="min-h-screen bg-gray-100 p-4">
+        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
             <Header username={username} isAdmin={isAdmin} />
 
-            {announcement && (
-                <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded">
+            {announcement.text && (
+                <div className={getAnnouncementClasses()}>
                     <p className="font-bold">Announcement</p>
-                    <p>{announcement}</p>
+                    <p>{announcement.text}</p>
                 </div>
             )}
 
-            <h2 className="text-lg font-medium mb-4">Your Availability</h2>
+            <h2 className="text-lg font-medium mb-4 text-gray-900 dark:text-white">Your Availability</h2>
 
-            {/* Mobile View - Day Selector */}
-            <div className="md:hidden mb-4">
-                <label htmlFor="day-select" className="block text-sm font-medium text-gray-700 mb-1">
-                    Select Day
-                </label>
-                <select
-                    id="day-select"
-                    className="w-full p-2 border border-gray-300 rounded"
-                    value={selectedDay || ''}
-                    onChange={(e) => setSelectedDay(e.target.value || null)}
-                >
-                    <option value="">Select a day</option>
-                    {days.map(day => (
-                        <option key={day} value={day}>{day}</option>
-                    ))}
-                </select>
-
-                {selectedDay && (
-                    <div className="mt-4 bg-white shadow rounded-lg overflow-hidden">
-                        <div className="p-3 bg-gray-100 font-medium">{selectedDay}</div>
-                        {timeSlots.map(time => {
-                            const key = `${selectedDay}-${time}`;
-                            const isAvailable = availability[key];
-                            const count = countAvailableUsers(selectedDay, time);
-
-                            return (
-                                <div
-                                    key={key}
-                                    className={`p-3 border-b border-gray-200 flex justify-between items-center ${
-                                        isAvailable ? 'bg-green-50' : ''
-                                    }`}
-                                    onClick={() => toggleAvailability(selectedDay, time)}
-                                >
-                                    <span>{time}:00 - {time + 1}:00</span>
-                                    <div className="flex items-center">
-                                        <span className="text-sm text-gray-500 mr-2">{count} available</span>
-                                        <span className={`h-5 w-5 rounded-full flex items-center justify-center ${
-                                            isAvailable ? 'bg-green-500 text-white' : 'bg-gray-200'
-                                        }`}>
-                      {isAvailable ? '✓' : ''}
-                    </span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {/* Desktop View - Full Calendar Grid */}
-            <div className="hidden md:block bg-white shadow rounded-lg overflow-hidden">
-                <div className="grid grid-cols-8 gap-px bg-gray-200">
-                    {/* Header row */}
-                    <div className="bg-gray-100 p-2"></div> {/* Empty cell for time column */}
-                    {days.map(day => (
-                        <div key={day} className="bg-gray-100 p-2 text-center font-medium">
-                            {day}
-                        </div>
-                    ))}
-
-                    {/* Time slots */}
-                    {timeSlots.map(time => (
-                        <React.Fragment key={`time-${time}`}>
-                            <div className="bg-white p-2 border-b border-gray-200">
-                                {time}:00 - {time + 1}:00
-                            </div>
-
-                            {days.map(day => {
-                                const key = `${day}-${time}`;
-                                const isAvailable = availability[key];
-                                const count = countAvailableUsers(day, time);
-
-                                return (
-                                    <div
-                                        key={key}
-                                        className={`bg-white p-2 border-b border-gray-200 text-center cursor-pointer ${
-                                            isAvailable ? 'bg-green-50' : ''
-                                        }`}
-                                        onClick={() => toggleAvailability(day, time)}
-                                    >
-                                        <div className="flex flex-col items-center">
-                                            {isAvailable ?
-                                                <span className="h-6 w-6 rounded-full bg-green-500 text-white flex items-center justify-center">✓</span>
-                                                :
-                                                <span className="h-6 w-6 rounded-full bg-gray-200"></span>
-                                            }
-                                            <span className="text-xs text-gray-500 mt-1">{count > 0 ? `${count} available` : ''}</span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </React.Fragment>
-                    ))}
-                </div>
-            </div>
-
-            {/* Add Group Availability Component */}
-            <GroupAvailability
+            <DateCalendar
+                username={username}
+                maxWeeks={maxWeeks}
+                onAvailabilityChange={handleAvailabilityChange}
                 allUsersAvailability={allUsersAvailability}
-                days={days}
-                timeSlots={timeSlots}
             />
 
             {/* Add Poll Component */}
-            <PollComponent />
+            <div className="mt-8">
+                <PollComponent />
+            </div>
         </div>
     );
 }

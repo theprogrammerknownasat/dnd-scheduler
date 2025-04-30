@@ -1,29 +1,7 @@
-// src/app/api/polls/vote/route.ts
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import { cookies } from 'next/headers';
-
-const getPollsPath = () => path.join(process.cwd(), 'data', 'polls.json');
-
-const getPolls = () => {
-    try {
-        return JSON.parse(fs.readFileSync(getPollsPath(), 'utf-8'));
-    } catch (error) {
-        console.error('Error reading polls:', error);
-        return [];
-    }
-};
-
-const savePolls = (polls: any[]) => {
-    try {
-        fs.writeFileSync(getPollsPath(), JSON.stringify(polls, null, 2));
-        return true;
-    } catch (error) {
-        console.error('Error saving polls:', error);
-        return false;
-    }
-};
+import dbConnect from '@/lib/mongodb';
+import Poll from '@/models/Poll';
 
 // Vote on a poll
 export async function POST(request: Request) {
@@ -47,11 +25,12 @@ export async function POST(request: Request) {
             );
         }
 
-        const polls = getPolls();
+        await dbConnect();
 
-        const pollIndex = polls.findIndex((poll: any) => poll.id === pollId);
+        // Find the poll
+        const poll = await Poll.findById(pollId);
 
-        if (pollIndex === -1) {
+        if (!poll) {
             return NextResponse.json(
                 { success: false, error: 'Poll not found' },
                 { status: 404 }
@@ -59,7 +38,7 @@ export async function POST(request: Request) {
         }
 
         // Check if the option is valid
-        if (!polls[pollIndex].options.includes(option)) {
+        if (!poll.options.includes(option)) {
             return NextResponse.json(
                 { success: false, error: 'Invalid option' },
                 { status: 400 }
@@ -67,17 +46,15 @@ export async function POST(request: Request) {
         }
 
         // Record the vote
-        polls[pollIndex].votes[username] = option;
+        const votes = poll.votes.toJSON();
+        votes[username] = option;
+        poll.votes = votes;
 
-        if (savePolls(polls)) {
-            return NextResponse.json({ success: true });
-        } else {
-            return NextResponse.json(
-                { success: false, error: 'Could not save vote' },
-                { status: 500 }
-            );
-        }
+        await poll.save();
+
+        return NextResponse.json({ success: true });
     } catch (error) {
+        console.error('Error in /api/polls/vote:', error);
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
