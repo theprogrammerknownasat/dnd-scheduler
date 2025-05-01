@@ -1,3 +1,4 @@
+// src/app/api/calendar/availability/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { parseISO, addDays, format } from 'date-fns';
@@ -16,10 +17,11 @@ export async function GET(request: Request) {
             );
         }
 
-        // Get date range from query params
+        // Get date range and campaignId from query params
         const { searchParams } = new URL(request.url);
         const startDate = searchParams.get('start');
         const endDate = searchParams.get('end');
+        const campaignId = searchParams.get('campaignId');
 
         if (!startDate || !endDate) {
             return NextResponse.json(
@@ -28,14 +30,22 @@ export async function GET(request: Request) {
             );
         }
 
+        if (!campaignId) {
+            return NextResponse.json(
+                { success: false, error: 'Campaign ID is required' },
+                { status: 400 }
+            );
+        }
+
         await dbConnect();
 
-        // Query availability for the date range
+        // Query availability for the date range and campaign
         const startDateObj = parseISO(startDate);
         const endDateObj = parseISO(endDate);
 
         const availabilityRecords = await Availability.find({
             username,
+            campaignId,
             date: {
                 $gte: startDateObj,
                 $lte: endDateObj
@@ -77,24 +87,29 @@ export async function POST(request: Request) {
             );
         }
 
-        const { date, hour, isAvailable } = await request.json();
+        const { date, hour, isAvailable, campaignId } = await request.json();
 
-        if (!date || hour === undefined) {
+        if (!date || hour === undefined || !campaignId) {
             return NextResponse.json(
-                { success: false, error: 'Date and hour are required' },
+                { success: false, error: 'Date, hour, and campaignId are required' },
                 { status: 400 }
             );
         }
 
         await dbConnect();
 
-        // Find or create availability record for this date
+        // Find or create availability record for this date and campaign
         const dateObj = parseISO(date);
-        let availabilityRecord = await Availability.findOne({ username, date: dateObj });
+        let availabilityRecord = await Availability.findOne({
+            username,
+            campaignId,
+            date: dateObj
+        });
 
         if (!availabilityRecord) {
             availabilityRecord = new Availability({
                 username,
+                campaignId,
                 date: dateObj,
                 timeSlots: {}
             });

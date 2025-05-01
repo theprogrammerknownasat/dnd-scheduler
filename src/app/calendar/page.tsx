@@ -1,8 +1,8 @@
 // src/app/calendar/page.tsx
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { format } from 'date-fns';
+import {addWeeks, format} from 'date-fns';
 import Header from '../components/Header';
 import DateCalendar from '../components/DateCalendar';
 import PollComponent from '../components/PollComponent';
@@ -32,6 +32,24 @@ interface Announcement {
     createdAt?: string;
 }
 
+function debounce<T extends (...args: any[]) => any>(
+    func: T,
+    wait: number
+): (...args: Parameters<T>) => void {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    return function executedFunction(...args: Parameters<T>) {
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+
+        timeout = setTimeout(() => {
+            func(...args);
+            timeout = null;
+        }, wait);
+    };
+}
+
 export default function Calendar() {
     const [username, setUsername] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
@@ -46,6 +64,11 @@ export default function Calendar() {
     const [showScheduleForm, setShowScheduleForm] = useState(false);
     const [scheduleDate, setScheduleDate] = useState<Date | null>(null);
     const [timeFormat, setTimeFormat] = useState<'12h' | '24h'>(getUserTimeFormat());
+    const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+    const [isLoadingScheduledSessions, setIsLoadingScheduledSessions] = useState(false);
+    const [lastFetchTimestamp, setLastFetchTimestamp] = useState(0);
+    const [campaignDataVersion, setCampaignDataVersion] = useState(0);
+
 
     const router = useRouter();
 
@@ -55,6 +78,47 @@ export default function Calendar() {
         setTimeFormat(newFormat);
         setUserTimeFormat(newFormat);
     };
+
+    const debouncedFetchAllUsersAvailability = useCallback(
+        debounce(async (startDate: string, endDate: string) => {
+            try {
+                if (!currentCampaignId) return;
+
+                console.log(`Fetching all users availability for campaign: ${currentCampaignId}`);
+
+                const response = await fetch(`/api/calendar/all-availability?campaignId=${currentCampaignId}&start=${startDate}&end=${endDate}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    setAllUsersAvailability(data.availability);
+                }
+            } catch (err) {
+                console.error('Error fetching all users availability:', err);
+            }
+        }, 500), // 500ms debounce
+        [currentCampaignId] // Re-create when campaignId changes
+    );
+
+// Debounced version of fetchScheduledSessions
+    const debouncedFetchScheduledSessions = useCallback(
+        debounce(async (startDate: string, endDate: string) => {
+            try {
+                if (!currentCampaignId) return;
+
+                console.log(`Fetching scheduled sessions for campaign: ${currentCampaignId}`);
+
+                const response = await fetch(`/api/scheduled-sessions?campaignId=${currentCampaignId}&start=${startDate}&end=${endDate}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    setScheduledSessions(data.sessions);
+                }
+            } catch (err) {
+                console.error('Error fetching scheduled sessions:', err);
+            }
+        }, 500), // 500ms debounce
+        [currentCampaignId] // Re-create when campaignId changes
+    );
 
     // Fetch user info and campaigns
     useEffect(() => {
@@ -193,6 +257,15 @@ export default function Calendar() {
                     });
 
                     setAllUsers(usersMap);
+
+                    // Get current date
+                    const today = new Date();
+                    const startDate = format(today, 'yyyy-MM-dd');
+                    const endDate = format(addWeeks(today, 1), 'yyyy-MM-dd');
+
+                    // Fetch initial data for the current week
+                    await fetchAllUsersAvailability(startDate, endDate);
+                    await fetchScheduledSessions(startDate, endDate);
                 }
 
                 // Save this campaign as the last selected
@@ -212,32 +285,42 @@ export default function Calendar() {
         try {
             if (!currentCampaignId) return;
 
+            console.log(`Fetching availability for campaign: ${currentCampaignId}`);
+
             const response = await fetch(`/api/calendar/all-availability?campaignId=${currentCampaignId}&start=${startDate}&end=${endDate}`);
             const data = await response.json();
 
             if (data.success) {
-                setAllUsersAvailability(data.availability);
+                setAllUsersAvailability(data.availability || {});
+            } else {
+                console.error("Error fetching availability:", data.error);
             }
         } catch (err) {
             console.error('Error fetching all users availability:', err);
         }
     };
 
+
     // Fetch scheduled sessions for the current week
     const fetchScheduledSessions = async (startDate: string, endDate: string) => {
         try {
             if (!currentCampaignId) return;
 
+            console.log(`Fetching scheduled sessions for campaign: ${currentCampaignId}`);
+
             const response = await fetch(`/api/scheduled-sessions?campaignId=${currentCampaignId}&start=${startDate}&end=${endDate}`);
             const data = await response.json();
 
             if (data.success) {
-                setScheduledSessions(data.sessions);
+                setScheduledSessions(data.sessions || []);
+            } else {
+                console.error("Error fetching sessions:", data.error);
             }
         } catch (err) {
             console.error('Error fetching scheduled sessions:', err);
         }
     };
+
 
     // Handle updating availability
     const handleAvailabilityChange = async (date: Date, hour: number, isAvailable: boolean) => {
@@ -252,36 +335,98 @@ export default function Calendar() {
             newState[username][`${dateStr}-${hour}`] = isAvailable;
             return newState;
         });
+
+        // If there's no campaignId, don't try to save to the server
+        if (!currentCampaignId) return;
+
+        // Log for debugging
+        console.log(`Updating availability for ${username} on ${dateStr} at ${hour}:00 to ${isAvailable ? 'available' : 'unavailable'} in campaign ${currentCampaignId}`);
+
+        // Optionally send the update to the server directly if needed
+        try {
+            await fetch('/api/calendar/availability', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    campaignId: currentCampaignId,
+                    date: dateStr,
+                    hour,
+                    isAvailable
+                }),
+            });
+        } catch (err) {
+            console.error('Error updating availability on server:', err);
+        }
     };
 
     // Handle campaign change
     const handleCampaignChange = (campaignId: string) => {
-        setCurrentCampaignId(campaignId);
-        // Reset state that depends on the campaign
+        if (campaignId === currentCampaignId) return; // Don't do anything if the ID hasn't changed
+
+        console.log(`Switching to campaign: ${campaignId}`);
+
+        // Reset ALL campaign-specific state
         setAllUsersAvailability({});
         setScheduledSessions([]);
+        setAnnouncement({ text: '', color: 'yellow' });
+
+        // Set the new campaign ID
+        setCurrentCampaignId(campaignId);
+
         // Save to localStorage
         localStorage.setItem('lastCampaignId', campaignId);
     };
-
     // Handle scheduling a session
-    const handleScheduleSession = (date: Date) => {
-        setScheduleDate(date);
-        setShowScheduleForm(true);
-    };
-
-    // Handle session creation
     const handleSessionCreated = async () => {
+        console.log("Session created!");
+
+        // Close the form first
+        setShowScheduleForm(false);
+
         // Refresh scheduled sessions
         if (scheduleDate) {
+            // Use a wider date range to capture potential multi-day sessions
             const startDate = format(scheduleDate, 'yyyy-MM-dd');
-            const endDate = format(scheduleDate, 'yyyy-MM-dd');
+            const endDate = format(addWeeks(scheduleDate, 1), 'yyyy-MM-dd');
+
+            console.log("Refreshing sessions for date range:", startDate, "to", endDate);
+
+            // Fetch the updated sessions
             await fetchScheduledSessions(startDate, endDate);
         }
-
-        // Close the form
-        setShowScheduleForm(false);
     };
+
+// 5. Add a debugging message when scheduling a session
+    const handleScheduleSession = (date: Date) => {
+        console.log("Schedule session called with date:", format(date, 'yyyy-MM-dd'));
+
+        // Save the date for the form
+        setScheduleDate(date);
+
+        // Show the form
+        setShowScheduleForm(true);
+
+        // Log current state for debugging
+        console.log("Current campaign ID:", currentCampaignId);
+        console.log("Show schedule form set to:", true);
+    };
+
+    useEffect(() => {
+        if (!currentCampaignId) return;
+
+        // Load initial data for the current campaign
+        const today = new Date();
+        const startDate = format(today, 'yyyy-MM-dd');
+        const endDate = format(addWeeks(today, 2), 'yyyy-MM-dd');
+
+        // Fetch data for the current date range
+        fetchAllUsersAvailability(startDate, endDate);
+        fetchScheduledSessions(startDate, endDate);
+
+        // This effect should run whenever the campaign changes or the data version changes
+    }, [currentCampaignId, campaignDataVersion]);
+
+    const memoizedCampaignId = React.useMemo(() => currentCampaignId, [currentCampaignId]);
 
     const getAnnouncementClasses = () => {
         const baseClasses = "border-l-4 p-4 mb-4 rounded";
@@ -366,6 +511,7 @@ export default function Calendar() {
                 fetchAllUsersAvailability={fetchAllUsersAvailability}
                 fetchScheduledSessions={fetchScheduledSessions}
                 timeFormat={timeFormat}
+                key={`${currentCampaignId}-${campaignDataVersion}`} // Add a key to force re-render when campaign changes
             />
 
             {/* Add Poll Component */}
@@ -375,13 +521,21 @@ export default function Calendar() {
 
             {/* Scheduled Session Form */}
             {showScheduleForm && scheduleDate && (
-                <ScheduledSessionForm
-                    campaignId={currentCampaignId}
-                    date={scheduleDate}
-                    onClose={() => setShowScheduleForm(false)}
-                    onSessionCreated={handleSessionCreated}
-                    timeFormat={timeFormat}
-                />
+                <div className="fixed inset-0 z-50">
+                    <ScheduledSessionForm
+                        campaignId={currentCampaignId}
+                        date={scheduleDate}
+                        onClose={() => {
+                            console.log("Closing session form");
+                            setShowScheduleForm(false);
+                        }}
+                        onSessionCreated={() => {
+                            console.log("Session created callback fired");
+                            handleSessionCreated();
+                        }}
+                        timeFormat={timeFormat}
+                    />
+                </div>
             )}
         </div>
     );

@@ -1,7 +1,7 @@
 // src/app/components/ScheduledSessionForm.tsx
 "use client";
-import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { useState, useEffect, useRef } from 'react';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, getDay, addDays, isSameMonth, isSameDay, parseISO, isToday } from 'date-fns';
 import { formatTime } from '@/utils/dateTimeFormatter';
 
 interface ScheduledSessionFormProps {
@@ -14,20 +14,74 @@ interface ScheduledSessionFormProps {
 
 export default function ScheduledSessionForm({
                                                  campaignId,
-                                                 date,
+                                                 date: initialDate,
                                                  onClose,
                                                  onSessionCreated,
                                                  timeFormat = '12h'
                                              }: ScheduledSessionFormProps) {
     const [title, setTitle] = useState('');
+    const [date, setDate] = useState(initialDate);
     const [startTime, setStartTime] = useState(12); // Default to noon
     const [endTime, setEndTime] = useState(14); // Default to 2 hours
     const [notes, setNotes] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [currentMonth, setCurrentMonth] = useState(initialDate);
+
+    const datePickerRef = useRef<HTMLDivElement>(null);
 
     // Available time slots (8 AM to 10 PM)
     const timeSlots = Array.from({ length: 15 }, (_, i) => i + 8);
+
+    // Handle clicks outside the date picker
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+                setShowDatePicker(false);
+            }
+        }
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
+
+    // Generate calendar for date picker
+    const generateCalendarMonth = () => {
+        // Get first day of month and last day of month
+        const firstDayOfMonth = startOfMonth(currentMonth);
+        const lastDayOfMonth = endOfMonth(currentMonth);
+
+        // Get the day of week for the first day (0 = Sunday, 1 = Monday, etc.)
+        const firstDayOfWeek = getDay(firstDayOfMonth);
+
+        // Adjust for starting week on Monday
+        const adjustedFirstDay = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+        // Generate days from previous month to fill first week
+        const daysFromPrevMonth = adjustedFirstDay;
+        const prevMonthDays = Array.from({length: daysFromPrevMonth}, (_, i) =>
+            addDays(firstDayOfMonth, -(daysFromPrevMonth - i))
+        );
+
+        // Generate days of current month
+        const currentMonthDays = Array.from(
+            {length: lastDayOfMonth.getDate()},
+            (_, i) => addDays(firstDayOfMonth, i)
+        );
+
+        // Generate days from next month to complete the grid (6 weeks = 42 days)
+        const totalDays = 42; // 6 weeks
+        const daysFromNextMonth = totalDays - prevMonthDays.length - currentMonthDays.length;
+        const nextMonthDays = Array.from({length: daysFromNextMonth}, (_, i) =>
+            addDays(lastDayOfMonth, i + 1)
+        );
+
+        // Combine all days
+        return [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
+    };
 
     // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
@@ -81,7 +135,7 @@ export default function ScheduledSessionForm({
                 <div className="p-6">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                            Schedule Session for {format(date, 'EEEE, MMMM d, yyyy')}
+                            Schedule Session
                         </h2>
                         <button
                             onClick={onClose}
@@ -113,6 +167,93 @@ export default function ScheduledSessionForm({
                                 placeholder="e.g., Dungeon Delve #5"
                                 required
                             />
+                        </div>
+
+                        <div className="mb-4 relative">
+                            <label htmlFor="date" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Date
+                            </label>
+                            <div className="mt-1 relative">
+                                <button
+                                    type="button"
+                                    className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-left focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-700 dark:text-gray-300"
+                                    onClick={() => setShowDatePicker(!showDatePicker)}
+                                >
+                                    <div className="flex justify-between items-center">
+                                        <span>{format(date, 'EEEE, MMMM d, yyyy')}</span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                </button>
+
+                                {showDatePicker && (
+                                    <div
+                                        ref={datePickerRef}
+                                        className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg rounded-md overflow-hidden"
+                                    >
+                                        <div className="p-3">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                                                    className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                                    </svg>
+                                                </button>
+                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                    {format(currentMonth, 'MMMM yyyy')}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                                                    className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+
+                                            <div className="grid grid-cols-7 gap-1">
+                                                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
+                                                    <div key={i} className="text-center text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                        {day}
+                                                    </div>
+                                                ))}
+
+                                                {generateCalendarMonth().map((day, i) => {
+                                                    const isCurrentMonth = isSameMonth(day, currentMonth);
+                                                    const isSelectedDay = isSameDay(day, date);
+                                                    const isCurrentDay = isToday(day);
+
+                                                    return (
+                                                        <button
+                                                            key={i}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setDate(day);
+                                                                setShowDatePicker(false);
+                                                            }}
+                                                            className={`
+                                                                py-1 text-sm rounded-full
+                                                                ${!isCurrentMonth ? 'text-gray-400 dark:text-gray-600' : ''}
+                                                                ${isSelectedDay ? 'bg-indigo-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}
+                                                                ${isCurrentDay && !isSelectedDay ? 'border border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : ''}
+                                                                ${isCurrentMonth && !isSelectedDay && !isCurrentDay ? 'text-gray-700 dark:text-gray-300' : ''}
+                                                            `}
+                                                        >
+                                                            {format(day, 'd')}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 mb-4">

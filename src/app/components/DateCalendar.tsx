@@ -25,6 +25,8 @@ import {
     differenceInCalendarDays
 } from 'date-fns';
 import { formatTime, formatTimeRange } from '@/utils/dateTimeFormatter';
+import { daysInWeek } from 'date-fns/constants';
+import GroupAvailability from "@/app/components/GroupAvailability.tsx";
 
 // Zoom level configurations for different views
 const ZOOM_LEVELS = {
@@ -98,15 +100,18 @@ export default function DateCalendar({
     // Additional state for new features
     const [expandedDay, setExpandedDay] = useState<string | null>(null);
     const [zoomLevel, setZoomLevel] = useState(ZOOM_LEVELS.NORMAL);
-    const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState<string | null>(null);
     const [dragState, setDragState] = useState<boolean | null>(null);
     const [hoveredDay, setHoveredDay] = useState<Date | null>(null);
     const [hoveredTimeSlot, setHoveredTimeSlot] = useState<number | null>(null);
+    const [isDragging, setIsDragging] = useState<boolean>(false);
+    const [dragStartCell, setDragStartCell] = useState<string | null>(null);
+    const [dragValue, setDragValue] = useState<boolean | null>(null);
 
     // Refs
     const datePickerRef = useRef<HTMLDivElement>(null);
     const calendarRef = useRef<HTMLDivElement>(null);
+    const prevDaysRef = useRef<Date[]>([]);
 
     // Get time slots based on current zoom level
     const timeSlots = zoomLevel === ZOOM_LEVELS.IN
@@ -154,6 +159,24 @@ export default function DateCalendar({
         };
     }, []);
 
+    useEffect(() => {
+        const handleDragEnd = () => {
+            if (isDragging) {
+                setIsDragging(false);
+                setDragStartCell(null);
+                setDragValue(null);
+            }
+        };
+
+        window.addEventListener('mouseup', handleDragEnd);
+        window.addEventListener('touchend', handleDragEnd);
+
+        return () => {
+            window.removeEventListener('mouseup', handleDragEnd);
+            window.addEventListener('touchend', handleDragEnd);
+        };
+    }, [isDragging]);
+
     // Handle drag actions for the calendar
     useEffect(() => {
         function handleMouseUp() {
@@ -193,7 +216,21 @@ export default function DateCalendar({
     useEffect(() => {
         if (!campaignId) return;
 
+        // Only fetch data when the view has significantly changed (first day is different)
+        // This prevents repeated fetches for minor UI updates
         const fetchData = async () => {
+            // Store the current days in a ref to prevent re-fetching for the same days
+            if (prevDaysRef.current &&
+                prevDaysRef.current.length > 0 &&
+                daysInView.length > 0 &&
+                format(prevDaysRef.current[0], 'yyyy-MM-dd') === format(daysInView[0], 'yyyy-MM-dd')) {
+                // Skip if first day hasn't changed
+                return;
+            }
+
+            // Update ref to current days
+            prevDaysRef.current = daysInView;
+
             setIsLoading(true);
 
             // Format dates for API calls
@@ -209,12 +246,11 @@ export default function DateCalendar({
                     setAvailability(data.availability);
                 }
 
-                // Fetch all users' availability
+                // Fetch all users' availability and sessions - only if the functions exist
                 if (fetchAllUsersAvailability) {
                     await fetchAllUsersAvailability(startDate, endDate);
                 }
 
-                // Fetch scheduled sessions
                 if (fetchScheduledSessions) {
                     await fetchScheduledSessions(startDate, endDate);
                 }
@@ -225,7 +261,12 @@ export default function DateCalendar({
             }
         };
 
-        fetchData();
+        // Fetch data with delay to avoid rapid consecutive fetches
+        const timer = setTimeout(() => {
+            fetchData();
+        }, 300);
+
+        return () => clearTimeout(timer);
     }, [daysInView, campaignId, fetchAllUsersAvailability, fetchScheduledSessions]);
 
     // Change zoom level
@@ -307,11 +348,8 @@ export default function DateCalendar({
     const toggleAvailability = async (date: Date, hour: number, forceState?: boolean) => {
         if (!campaignId) return;
 
-        // Get the formatted date string
         const dateStr = format(date, 'yyyy-MM-dd');
         const key = `${dateStr}-${hour}`;
-
-        // Determine if the slot should be available
         const isAvailable = forceState !== undefined ? forceState : !availability[key];
 
         // Update local state
@@ -331,7 +369,7 @@ export default function DateCalendar({
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    campaignId,
+                    campaignId,  // Make sure this is included
                     date: dateStr,
                     hour,
                     isAvailable
@@ -354,16 +392,22 @@ export default function DateCalendar({
             return;
         }
 
-        const dateStr = format(date, 'yyyy-MM-dd');
-        const key = `${dateStr}-${hour}`;
+        // If user is holding shift key, initiate drag selection mode
+        if (window.event && (window.event as MouseEvent).shiftKey) {
+            const dateStr = format(date, 'yyyy-MM-dd');
+            const key = `${dateStr}-${hour}`;
 
-        // Set initial drag state (invert current state)
-        setIsDragging(true);
-        setDragStart(key);
-        setDragState(!availability[key]);
+            // Set initial drag state (invert current state)
+            setIsDragging(true);
+            setDragStart(key);
+            setDragState(!availability[key]);
 
-        // Toggle this cell immediately
-        toggleAvailability(date, hour, !availability[key]);
+            // Toggle this cell immediately
+            toggleAvailability(date, hour, !availability[key]);
+        } else {
+            // Regular click - just toggle the availability
+            toggleAvailability(date, hour);
+        }
     };
 
     // Handle mouse enter during drag
@@ -390,6 +434,47 @@ export default function DateCalendar({
         setHoveredTimeSlot(null);
     };
 
+    const handleDragStart = (date: Date, hour: number, event: React.MouseEvent) => {
+        // Prevent text selection during drag
+        event.preventDefault();
+
+        if (isPastDate(date) || (isToday(date) && new Date().getHours() >= hour)) {
+            return; // Don't allow dragging on past dates/hours
+        }
+
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const key = `${dateStr}-${hour}`;
+
+        // Set the start cell and current value (we'll toggle to the opposite)
+        setDragStartCell(key);
+
+        // Set the drag value (opposite of current value)
+        const currentValue = !!availability[key];
+        setDragValue(!currentValue);
+
+        // Start dragging
+        setIsDragging(true);
+
+        // Toggle the cell
+        toggleAvailability(date, hour);
+    };
+
+    const handleDragOver = (date: Date, hour: number) => {
+        if (!isDragging || dragValue === null) return;
+
+        if (isPastDate(date) || (isToday(date) && new Date().getHours() >= hour)) {
+            return; // Don't allow dragging on past dates/hours
+        }
+
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const key = `${dateStr}-${hour}`;
+
+        // Toggle to the drag value if it's different from current value
+        const currentValue = !!availability[key];
+        if (currentValue !== dragValue) {
+            toggleAvailability(date, hour, dragValue);
+        }
+    };
     // Count available users for a specific time slot
     const countAvailableUsers = (date: Date, hour: number) => {
         const dateStr = format(date, 'yyyy-MM-dd');
@@ -559,17 +644,17 @@ export default function DateCalendar({
         const dateStr = format(date, 'yyyy-MM-dd');
         const key = `${dateStr}-${hour}`;
 
-        // If already selected, toggle availability
-        if (selectedTimeSlot === key) {
+        // Always set the selected time slot when clicked, regardless of whether it was previously selected
+        setSelectedTimeSlot(key);
+
+        // Toggle availability only if holding Ctrl/Cmd key (for better selection experience)
+        if (window.event && (window.event as MouseEvent).ctrlKey) {
             toggleAvailability(date, hour);
-        } else {
-            // Otherwise, select the time slot for details
-            setSelectedTimeSlot(key);
         }
     };
 
     // Format time for display based on user preference
-    const displayTime = (hour: number) => {
+    const displayTime = useCallback((hour: number) => {
         // Check if it's a half hour
         const isHalf = !Number.isInteger(hour);
         const hourNum = Math.floor(hour);
@@ -582,34 +667,45 @@ export default function DateCalendar({
         } else {
             return `${hourNum}:${minutes}`;
         }
+    }, [timeFormat]);
+
+    const fetchAvailability = async () => {
+        setIsLoading(true);
+        try {
+            // Format dates for the week for the API
+            const startDate = format(daysInWeek[0], 'yyyy-MM-dd');
+            const endDate = format(daysInWeek[6], 'yyyy-MM-dd');
+
+            const response = await fetch(`/api/calendar/availability?campaignId=${campaignId}&start=${startDate}&end=${endDate}`);
+            const data = await response.json();
+
+            if (data.success) {
+                setAvailability(data.availability);
+            }
+        } catch (err) {
+            console.error('Error fetching availability:', err);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     // Render selected time slot details or hovered time slot preview
+    // Replace the renderTimeSlotDetails function in DateCalendar.tsx
+
     const renderTimeSlotDetails = () => {
-        // Check if we have a time slot selected or hovered
-        if (!selectedTimeSlot && (!hoveredDay || hoveredTimeSlot === null)) return null;
+        if (!selectedTimeSlot) return null;
 
-        let date: Date;
-        let hour: number;
+        // Parse the selected time slot
+        const [dateStr, hourStr] = selectedTimeSlot.split('-');
+        const date = parseISO(dateStr);
+        const hour = parseFloat(hourStr);
 
-        // Use selected time slot if available, otherwise use hover preview
-        if (selectedTimeSlot) {
-            const [dateStr, hourStr] = selectedTimeSlot.split('-');
-            date = parseISO(dateStr);
-            hour = parseFloat(hourStr);
-        } else {
-            date = hoveredDay!;
-            hour = hoveredTimeSlot!;
-        }
-
+        // Get availability info and session info
         const {availableUsers, unavailableUsers} = getUsersAvailability(date, hour);
         const session = getScheduledSession(date, hour);
-        const isPreview = !selectedTimeSlot && hoveredDay && hoveredTimeSlot !== null;
 
         return (
-            <div className={`mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md transition-opacity ${
-                isPreview ? 'opacity-90' : 'opacity-100'
-            }`}>
+            <div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
                 <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-white">
                     {format(date, 'EEEE, MMMM d')} at {displayTime(hour)}
                 </h3>
@@ -662,10 +758,18 @@ export default function DateCalendar({
                     </div>
                 </div>
 
-                {isAdmin && !session && !isPreview && (
+                {isAdmin && !session && (
                     <div className="mt-4">
                         <button
-                            onClick={() => onScheduleSession && onScheduleSession(date)}
+                            onClick={() => {
+                                // We need to ensure this function exists and is working
+                                console.log("Scheduling session for", date);
+                                if (onScheduleSession) {
+                                    onScheduleSession(date);
+                                } else {
+                                    console.error("onScheduleSession function is not defined");
+                                }
+                            }}
                             className="px-4 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded hover:bg-indigo-700 dark:hover:bg-indigo-600"
                         >
                             Schedule Session
@@ -675,6 +779,17 @@ export default function DateCalendar({
             </div>
         );
     };
+
+    const formattedDays = daysInView.map(day => format(day, 'yyyy-MM-dd'));
+
+    // Create a handler for scheduling from GroupAvailability
+    const handleGroupScheduleSession = (dateStr: string) => {
+        if (onScheduleSession) {
+            const date = parseISO(dateStr);
+            onScheduleSession(date);
+        }
+    };
+
 
     return (
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
@@ -889,6 +1004,7 @@ export default function DateCalendar({
                                 return (
                                     <div
                                         key={key}
+                                        data-time-slot={`${dateStr}-${hour}`}
                                         className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center 
                                             ${!isPast ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}
                                             ${isAvailable ? 'bg-green-50 dark:bg-green-900/20' : ''}
@@ -899,8 +1015,8 @@ export default function DateCalendar({
                                             ${isHovered ? 'ring-2 ring-gray-400 dark:ring-gray-500' : ''}
                                         `}
                                         onClick={() => !isPast && handleTimeSlotClick(day, hour)}
-                                        onMouseDown={() => !isPast && handleMouseDown(day, hour)}
-                                        onMouseEnter={() => handleMouseEnter(day, hour)}
+                                        onMouseDown={(e) => !isPast && handleDragStart(day, hour, e)}
+                                        onMouseEnter={() => !isPast && handleDragOver(day, hour)}
                                         onMouseLeave={handleMouseLeave}
                                     >
                                         <div className="flex flex-col items-center">
@@ -1007,6 +1123,7 @@ export default function DateCalendar({
                                         return (
                                             <div
                                                 key={key}
+                                                data-time-slot={`${dateStr}-${hour}`}
                                                 className={`p-3 flex justify-between items-center
                                                     ${!isPast ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}
                                                     ${isAvailable ? 'bg-green-50 dark:bg-green-900/20' : ''}
@@ -1015,7 +1132,32 @@ export default function DateCalendar({
                                                     ${isSelected ? 'ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}
                                                 `}
                                                 onClick={() => !isPast && handleTimeSlotClick(day, hour)}
-                                                onTouchStart={() => !isPast && handleMouseDown(day, hour)}
+                                                onTouchStart={(e) => {
+                                                    if (!isPast) {
+                                                        e.preventDefault();
+                                                        handleDragStart(day, hour, e as unknown as React.MouseEvent);
+                                                    }
+                                                }}
+                                                onTouchMove={(e) => {
+                                                    if (isDragging && !isPast) {
+                                                        e.preventDefault();
+                                                        const touch = e.touches[0];
+                                                        const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                                                        if (element) {
+                                                            // Try to find the closest time slot element
+                                                            const timeSlotElement = element.closest('[data-time-slot]');
+                                                            if (timeSlotElement) {
+                                                                const key = timeSlotElement.getAttribute('data-time-slot');
+                                                                if (key) {
+                                                                    const [dateStr, hourStr] = key.split('-');
+                                                                    const date = parseISO(dateStr);
+                                                                    const hour = parseFloat(hourStr);
+                                                                    handleDragOver(date, hour);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }}
                                             >
                                                 <div className="flex items-center">
                                                     <span className="text-gray-700 dark:text-gray-300">{displayTime(hour)}</span>
@@ -1045,8 +1187,22 @@ export default function DateCalendar({
                 })}
             </div>
 
-            {/* Time Slot Details */}
-            {renderTimeSlotDetails()}
+            <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
+                <GroupAvailability
+                    allUsersAvailability={allUsersAvailability}
+                    days={daysInView.map(day => format(day, 'yyyy-MM-dd'))}
+                    timeSlots={timeSlots.filter(Number.isInteger)} // Only use full hours for group view
+                    isAdmin={isAdmin}
+                    onScheduleSession={(dateStr) => {
+                        if (onScheduleSession) {
+                            const date = parseISO(dateStr);
+                            onScheduleSession(date);
+                        }
+                    }}
+                    timeFormat={timeFormat}
+                    campaignId={campaignId}
+                />
+            </div>
         </div>
     );
 }
