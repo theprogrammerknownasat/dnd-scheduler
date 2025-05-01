@@ -97,8 +97,13 @@ export default function Login() {
             const data = await response.json();
 
             if (data.success) {
-                // Redirect to the main app
-                router.push('/calendar');
+                // Check if user needs to set up profile
+                if (data.needsSetup) {
+                    router.push('/setup-profile');
+                } else {
+                    // Redirect to the main app
+                    router.push('/calendar');
+                }
             } else {
                 setError('Incorrect password. Please try again.');
             }
@@ -132,8 +137,13 @@ export default function Login() {
             const data = await response.json();
 
             if (data.success) {
-                // Redirect to the main app
-                router.push('/calendar');
+                // Check if user needs to set up profile
+                if (data.needsSetup) {
+                    router.push('/setup-profile');
+                } else {
+                    // Redirect to the main app
+                    router.push('/calendar');
+                }
             } else {
                 setError('Could not create password. Please try again.');
             }

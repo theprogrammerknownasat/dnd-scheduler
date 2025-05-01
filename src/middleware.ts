@@ -1,4 +1,4 @@
-// src/middleware.ts
+// src/middleware.ts (updated to handle setup-profile)
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { updateActiveUser } from './app/api/admin/active-users/route';
@@ -13,6 +13,9 @@ export function middleware(request: NextRequest) {
     // Define admin-only paths
     const adminPaths = ['/admin'];
 
+    // Define paths that logged-in users can access even without setup
+    const setupAllowedPaths = ['/setup-profile'];
+
     const path = request.nextUrl.pathname;
 
     // Update active user status
@@ -25,6 +28,9 @@ export function middleware(request: NextRequest) {
 
     // Check if the path is a public path
     const isPublicPath = publicPaths.some(pp => path.startsWith(pp));
+
+    // Check if the path is allowed during setup
+    const isSetupAllowedPath = setupAllowedPaths.some(sp => path.startsWith(sp));
 
     // If the user is trying to access a protected route without being logged in
     if (!currentUser && !isPublicPath) {

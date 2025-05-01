@@ -1,3 +1,4 @@
+// src/app/api/auth/login/route.ts (updated to check for display name)
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import dbConnect from '@/lib/mongodb';
@@ -25,7 +26,13 @@ export async function POST(request: Request) {
                 path: '/',
             });
 
-            return NextResponse.json({ success: true });
+            // Check if user has a display name set
+            const needsSetup = !user.displayName;
+
+            return NextResponse.json({
+                success: true,
+                needsSetup
+            });
         } else {
             return NextResponse.json(
                 { success: false, error: 'Invalid credentials' },

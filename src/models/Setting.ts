@@ -3,7 +3,9 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ISetting extends Document {
     key: string;
-    value: any;
+    maxFutureWeeks: number;
+    disableDisplayNameEditing: boolean;
+    displayNameFilter: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -11,7 +13,9 @@ export interface ISetting extends Document {
 const SettingSchema: Schema = new Schema(
     {
         key: { type: String, required: true, unique: true },
-        value: { type: Schema.Types.Mixed, required: true },
+        maxFutureWeeks: { type: Number, default: 12 },
+        disableDisplayNameEditing: { type: Boolean, default: false },
+        displayNameFilter: { type: String, default: '' },
     },
     { timestamps: true }
 );
