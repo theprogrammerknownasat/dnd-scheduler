@@ -1,8 +1,10 @@
+// src/app/components/PollComponent.tsx
 "use client";
 import { useState, useEffect } from 'react';
 
 interface Poll {
     _id: string;
+    campaignId: string;
     question: string;
     options: string[];
     votes: Record<string, string>;
@@ -11,7 +13,11 @@ interface Poll {
     createdAt: string;
 }
 
-export default function PollComponent() {
+interface PollComponentProps {
+    campaignId: string;
+}
+
+export default function PollComponent({ campaignId }: PollComponentProps) {
     const [polls, setPolls] = useState<Poll[]>([]);
     const [isAdmin, setIsAdmin] = useState(false);
     const [username, setUsername] = useState('');
@@ -19,9 +25,15 @@ export default function PollComponent() {
 
     useEffect(() => {
         const fetchPolls = async () => {
+            if (!campaignId) {
+                setPolls([]);
+                setLoading(false);
+                return;
+            }
+
             setLoading(true);
             try {
-                const response = await fetch('/api/polls');
+                const response = await fetch(`/api/polls?campaignId=${campaignId}`);
                 const data = await response.json();
 
                 if (data.success) {
@@ -48,9 +60,9 @@ export default function PollComponent() {
             }
         };
 
-        fetchPolls();
         fetchUserInfo();
-    }, []);
+        fetchPolls();
+    }, [campaignId]);
 
     // Handle voting
     const handleVote = async (pollId: string, option: string) => {
@@ -65,7 +77,7 @@ export default function PollComponent() {
 
             if (data.success) {
                 // Refresh polls
-                const updatedResponse = await fetch('/api/polls');
+                const updatedResponse = await fetch(`/api/polls?campaignId=${campaignId}`);
                 const updatedData = await updatedResponse.json();
 
                 if (updatedData.success) {
@@ -125,7 +137,7 @@ export default function PollComponent() {
                             onClick={() => handleVote(poll._id, option)}
                         >
                             <div className="flex justify-between items-center mb-1">
-                                <span>{option}</span>
+                                <span className="text-gray-900 dark:text-white">{option}</span>
                                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   {votes} vote{votes !== 1 ? 's' : ''} ({percentage}%)
                 </span>

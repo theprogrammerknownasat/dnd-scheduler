@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@types/uuid": "^10.0.0",
+    "bcrypt": "^5.1.1",
     "date-fns": "^4.1.0",
     "mongodb": "^6.16.0",
     "mongoose": "^8.14.1",
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/bcrypt": "^5.0.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

@@ -30,7 +30,13 @@ export async function POST(request: Request) {
                 path: '/',
             });
 
-            return NextResponse.json({ success: true });
+            // Check if user has a display name set
+            const needsSetup = !user.displayName;
+
+            return NextResponse.json({
+                success: true,
+                needsSetup
+            });
         } else {
             return NextResponse.json(
                 { success: false, error: 'User not found' },

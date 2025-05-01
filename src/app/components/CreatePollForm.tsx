@@ -1,18 +1,51 @@
 // src/app/components/CreatePollForm.tsx
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+interface Campaign {
+    _id: string;
+    name: string;
+}
 
 interface CreatePollFormProps {
     onPollCreated?: () => void;
+    selectedCampaign?: string;
 }
 
-export default function CreatePollForm({ onPollCreated }: CreatePollFormProps) {
+export default function CreatePollForm({ onPollCreated, selectedCampaign }: CreatePollFormProps) {
     const [newPoll, setNewPoll] = useState({
         question: '',
         options: ['', ''],
-        isBlind: false
+        isBlind: false,
+        campaignId: selectedCampaign || '',
     });
+    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [error, setError] = useState('');
+
+    // Fetch available campaigns
+    useEffect(() => {
+        const fetchCampaigns = async () => {
+            try {
+                const response = await fetch('/api/campaigns');
+                const data = await response.json();
+
+                if (data.success) {
+                    setCampaigns(data.campaigns);
+
+                    // If a campaign is selected or there's only one campaign, use it
+                    if (selectedCampaign) {
+                        setNewPoll(prev => ({ ...prev, campaignId: selectedCampaign }));
+                    } else if (data.campaigns.length === 1) {
+                        setNewPoll(prev => ({ ...prev, campaignId: data.campaigns[0]._id }));
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching campaigns:', err);
+            }
+        };
+
+        fetchCampaigns();
+    }, [selectedCampaign]);
 
     const handleAddOption = () => {
         setNewPoll({
@@ -52,6 +85,11 @@ export default function CreatePollForm({ onPollCreated }: CreatePollFormProps) {
             return;
         }
 
+        if (!newPoll.campaignId) {
+            setError('Please select a campaign');
+            return;
+        }
+
         const emptyOptions = newPoll.options.filter(option => !option.trim());
         if (emptyOptions.length > 0) {
             setError('All options must have content');
@@ -72,7 +110,8 @@ export default function CreatePollForm({ onPollCreated }: CreatePollFormProps) {
                 setNewPoll({
                     question: '',
                     options: ['', ''],
-                    isBlind: false
+                    isBlind: false,
+                    campaignId: newPoll.campaignId,
                 });
 
                 // Call callback if provided
@@ -99,6 +138,27 @@ export default function CreatePollForm({ onPollCreated }: CreatePollFormProps) {
             )}
 
             <div className="space-y-4">
+                {campaigns.length > 1 && !selectedCampaign && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Campaign
+                        </label>
+                        <select
+                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded
+                        bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            value={newPoll.campaignId}
+                            onChange={(e) => setNewPoll({ ...newPoll, campaignId: e.target.value })}
+                        >
+                            <option value="">Select a campaign</option>
+                            {campaigns.map(campaign => (
+                                <option key={campaign._id} value={campaign._id}>
+                                    {campaign.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
                 <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Question

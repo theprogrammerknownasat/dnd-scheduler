@@ -1,3 +1,4 @@
+// src/app/api/admin/users/[id]/route.ts (updated to handle displayName)
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import dbConnect from '@/lib/mongodb';
@@ -6,9 +7,10 @@ import User from '@/models/User';
 // Update user (admin only)
 export async function PUT(
     request: Request,
-    { params }: { params: { id: string } }
+    context: { params: { id: string } }
 ) {
     try {
+        const { params } = context;
         const id = params.id;
         const cookieStore = await cookies();
         const isAdmin = cookieStore.get('isAdmin')?.value === 'true';
@@ -20,7 +22,7 @@ export async function PUT(
             );
         }
 
-        const { username, password } = await request.json();
+        const { username, displayName, password } = await request.json();
 
         if (!username) {
             return NextResponse.json(
@@ -54,6 +56,11 @@ export async function PUT(
 
         // Update user fields
         user.username = username;
+
+        // Update display name if provided
+        if (displayName !== undefined) {
+            user.displayName = displayName;
+        }
 
         // Only update password if provided
         if (password) {

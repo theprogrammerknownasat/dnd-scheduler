@@ -1,71 +1,93 @@
-import { NextResponse } from 'next/server';
+// src/app/api/settings/route.ts
+import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import dbConnect from '@/lib/mongodb';
 import Setting from '@/models/Setting';
+import User from '@/models/User';
 
-// Get all settings
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        // Connect to the database
         await dbConnect();
 
-        // Get all settings
-        const settings: Record<string, any> = {};
-
-        const allSettings = await Setting.find({});
-        allSettings.forEach((setting) => {
-            settings[setting.key] = setting.value;
-        });
-
-        // Set default values if not found
-        if (!settings.maxFutureWeeks) {
-            settings.maxFutureWeeks = 12;
-        }
+        // Fetch global settings
+        const settings = await Setting.findOne({ key: 'global' });
 
         return NextResponse.json({
             success: true,
-            settings
+            settings: settings || {
+                maxFutureWeeks: 12,
+                disableDisplayNameEditing: false,
+                displayNameFilter: ''
+            }
         });
     } catch (error) {
-        console.error('Error in /api/settings (GET):', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        console.error('Error fetching settings:', error);
+        return NextResponse.json({
+            success: false,
+            error: 'Failed to fetch settings'
+        }, { status: 500 });
     }
 }
 
-// Update settings (admin only)
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
     try {
+        // Get the admin status from cookies
         const cookieStore = await cookies();
+        const username = cookieStore.get('user')?.value;
         const isAdmin = cookieStore.get('isAdmin')?.value === 'true';
 
-        if (!isAdmin) {
-            return NextResponse.json(
-                { success: false, error: 'Unauthorized' },
-                { status: 403 }
-            );
+        if (!username || !isAdmin) {
+            return NextResponse.json({
+                success: false,
+                error: 'Unauthorized'
+            }, { status: 401 });
         }
 
-        const settings = await request.json();
-
+        // Connect to the database
         await dbConnect();
 
-        // Update each setting
-        for (const [key, value] of Object.entries(settings)) {
-            await Setting.findOneAndUpdate(
-                { key },
-                { key, value },
-                { upsert: true } // Create if not exists
-            );
+        // Verify that the user is actually an admin
+        const user = await User.findOne({ username });
+
+        if (!user || !user.isAdmin) {
+            return NextResponse.json({
+                success: false,
+                error: 'Unauthorized'
+            }, { status: 401 });
         }
+
+        // Get settings from the request body
+        const data = await req.json();
+
+        // Validate and sanitize the data
+        const settingsToUpdate: any = {};
+
+        if (typeof data.maxFutureWeeks === 'number' && data.maxFutureWeeks > 0) {
+            settingsToUpdate.maxFutureWeeks = data.maxFutureWeeks;
+        }
+
+        if (typeof data.disableDisplayNameEditing === 'boolean') {
+            settingsToUpdate.disableDisplayNameEditing = data.disableDisplayNameEditing;
+        }
+
+        if (data.displayNameFilter !== undefined) {
+            settingsToUpdate.displayNameFilter = data.displayNameFilter;
+        }
+
+        // Update or create settings
+        await Setting.findOneAndUpdate(
+            { key: 'global' },
+            { $set: settingsToUpdate },
+            { upsert: true, new: true }
+        );
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error in /api/settings (POST):', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        console.error('Error updating settings:', error);
+        return NextResponse.json({
+            success: false,
+            error: 'Failed to update settings'
+        }, { status: 500 });
     }
 }

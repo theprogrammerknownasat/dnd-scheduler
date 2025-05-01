@@ -1,6 +1,32 @@
 @import "tailwindcss";
 
+
+/* Default light theme */
 :root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+/* Dark theme */
+.dark {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
+}
+
+/* This helps prevent flash of wrong theme */
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Add a script to ensure theme is set properly before page loads */
+
+/* :root {
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -24,3 +50,5 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+*/
