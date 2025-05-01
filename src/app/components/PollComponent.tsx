@@ -1,6 +1,7 @@
 // src/app/components/PollComponent.tsx
 "use client";
 import { useState, useEffect } from 'react';
+import { formatTimestamp } from '@/utils/dateTimeFormatter';
 
 interface Poll {
     _id: string;
@@ -139,8 +140,8 @@ export default function PollComponent({ campaignId }: PollComponentProps) {
                             <div className="flex justify-between items-center mb-1">
                                 <span className="text-gray-900 dark:text-white">{option}</span>
                                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {votes} vote{votes !== 1 ? 's' : ''} ({percentage}%)
-                </span>
+                                    {votes} vote{votes !== 1 ? 's' : ''} ({percentage}%)
+                                </span>
                             </div>
                             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                 <div
@@ -182,13 +183,18 @@ export default function PollComponent({ campaignId }: PollComponentProps) {
                 {polls.map(poll => (
                     <div key={poll._id} className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
                         <div className="p-4">
-                            <div className="flex justify-between items-start">
+                            <div className="flex justify-between items-start mb-2">
                                 <h3 className="text-md font-medium text-gray-900 dark:text-white">{poll.question}</h3>
-                                {poll.isBlind && (
-                                    <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs px-2 py-1 rounded">
-                    Blind Poll
-                  </span>
-                                )}
+                                <div className="flex flex-col items-end">
+                                    {poll.isBlind && (
+                                        <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs px-2 py-1 rounded mb-1">
+                                            Blind Poll
+                                        </span>
+                                    )}
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {formatTimestamp(poll.createdAt)}
+                                    </span>
+                                </div>
                             </div>
 
                             <PollResults poll={poll} />

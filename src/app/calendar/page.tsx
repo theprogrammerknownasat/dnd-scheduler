@@ -1,4 +1,4 @@
-// src/app/calendar/page.tsx (fixed version)
+// src/app/calendar/page.tsx
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,6 +8,7 @@ import DateCalendar from '../components/DateCalendar';
 import PollComponent from '../components/PollComponent';
 import CampaignSelector from '../components/CampaignSelector';
 import ScheduledSessionForm from '../components/ScheduledSessionForm';
+import { formatTimestamp, getUserTimeFormat, setUserTimeFormat } from '@/utils/dateTimeFormatter';
 
 interface User {
     _id: string;
@@ -25,10 +26,16 @@ interface ScheduledSession {
     notes: string;
 }
 
+interface Announcement {
+    text: string;
+    color: string;
+    createdAt?: string;
+}
+
 export default function Calendar() {
     const [username, setUsername] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
-    const [announcement, setAnnouncement] = useState({ text: '', color: 'yellow' });
+    const [announcement, setAnnouncement] = useState<Announcement>({ text: '', color: 'yellow' });
     const [allUsersAvailability, setAllUsersAvailability] = useState<Record<string, Record<string, boolean>>>({});
     const [allUsers, setAllUsers] = useState<Record<string, User>>({});
     const [maxWeeks, setMaxWeeks] = useState(12); // Default to 12 weeks
@@ -38,8 +45,16 @@ export default function Calendar() {
     const [scheduledSessions, setScheduledSessions] = useState<ScheduledSession[]>([]);
     const [showScheduleForm, setShowScheduleForm] = useState(false);
     const [scheduleDate, setScheduleDate] = useState<Date | null>(null);
+    const [timeFormat, setTimeFormat] = useState<'12h' | '24h'>(getUserTimeFormat());
 
     const router = useRouter();
+
+    // Toggle time format between 12h and 24h
+    const toggleTimeFormat = () => {
+        const newFormat = timeFormat === '12h' ? '24h' : '12h';
+        setTimeFormat(newFormat);
+        setUserTimeFormat(newFormat);
+    };
 
     // Fetch user info and campaigns
     useEffect(() => {
@@ -263,6 +278,9 @@ export default function Calendar() {
             const endDate = format(scheduleDate, 'yyyy-MM-dd');
             await fetchScheduledSessions(startDate, endDate);
         }
+
+        // Close the form
+        setShowScheduleForm(false);
     };
 
     const getAnnouncementClasses = () => {
@@ -301,19 +319,37 @@ export default function Calendar() {
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
             <Header username={username} isAdmin={isAdmin} />
 
-            <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-0 sm:mr-4">Calendar</h1>
-                <CampaignSelector
-                    currentCampaignId={currentCampaignId}
-                    onCampaignChange={handleCampaignChange}
-                    isAdmin={isAdmin}
-                />
+            <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-0 sm:mr-4">Calendar</h1>
+                    <CampaignSelector
+                        currentCampaignId={currentCampaignId}
+                        onCampaignChange={handleCampaignChange}
+                        isAdmin={isAdmin}
+                    />
+                </div>
+                <button
+                    onClick={toggleTimeFormat}
+                    className="mt-2 sm:mt-0 px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-md text-gray-800 dark:text-white text-sm hover:bg-gray-300 dark:hover:bg-gray-600"
+                >
+                    {timeFormat === '12h' ? '12h' : '24h'}
+                    <span className="ml-1 text-xs">↺</span>
+                </button>
             </div>
 
             {announcement.text && (
                 <div className={getAnnouncementClasses()}>
-                    <p className="font-bold">Announcement</p>
-                    <p>{announcement.text}</p>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="font-bold">Announcement</p>
+                            <p>{announcement.text}</p>
+                        </div>
+                        {announcement.createdAt && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                                {formatTimestamp(announcement.createdAt)}
+                            </span>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -327,6 +363,9 @@ export default function Calendar() {
                 scheduledSessions={scheduledSessions}
                 isAdmin={isAdmin}
                 onScheduleSession={handleScheduleSession}
+                fetchAllUsersAvailability={fetchAllUsersAvailability}
+                fetchScheduledSessions={fetchScheduledSessions}
+                timeFormat={timeFormat}
             />
 
             {/* Add Poll Component */}
@@ -341,6 +380,7 @@ export default function Calendar() {
                     date={scheduleDate}
                     onClose={() => setShowScheduleForm(false)}
                     onSessionCreated={handleSessionCreated}
+                    timeFormat={timeFormat}
                 />
             )}
         </div>
