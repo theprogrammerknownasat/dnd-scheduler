@@ -1,3 +1,4 @@
+// src/app/api/calendar/all-availability/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { parseISO, format } from 'date-fns';
@@ -16,10 +17,11 @@ export async function GET(request: Request) {
             );
         }
 
-        // Get date range from query params
+        // Get date range and campaignId from query params
         const { searchParams } = new URL(request.url);
         const startDate = searchParams.get('start');
         const endDate = searchParams.get('end');
+        const campaignId = searchParams.get('campaignId');
 
         if (!startDate || !endDate) {
             return NextResponse.json(
@@ -28,13 +30,21 @@ export async function GET(request: Request) {
             );
         }
 
+        if (!campaignId) {
+            return NextResponse.json(
+                { success: false, error: 'Campaign ID is required' },
+                { status: 400 }
+            );
+        }
+
         await dbConnect();
 
-        // Query all availability records for the date range
+        // Query all availability records for the date range and campaign
         const startDateObj = parseISO(startDate);
         const endDateObj = parseISO(endDate);
 
         const availabilityRecords = await Availability.find({
+            campaignId, // Filter by campaignId
             date: {
                 $gte: startDateObj,
                 $lte: endDateObj

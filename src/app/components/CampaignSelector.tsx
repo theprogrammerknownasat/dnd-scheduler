@@ -23,8 +23,11 @@ export default function CampaignSelector({
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
+    // Only fetch campaigns once on mount and when currentCampaignId changes
     useEffect(() => {
         const fetchCampaigns = async () => {
+            if (!currentCampaignId) return; // Don't fetch if no ID is set
+
             setLoading(true);
             try {
                 const response = await fetch('/api/campaigns');
@@ -32,12 +35,6 @@ export default function CampaignSelector({
 
                 if (data.success) {
                     setCampaigns(data.campaigns);
-
-                    // Set default campaign if none selected
-                    if (!currentCampaignId && data.campaigns.length > 0) {
-                        const firstCampaign = data.campaigns[0];
-                        onCampaignChange(firstCampaign._id);
-                    }
                 }
             } catch (err) {
                 console.error('Error fetching campaigns:', err);
@@ -47,7 +44,10 @@ export default function CampaignSelector({
         };
 
         fetchCampaigns();
-    }, [currentCampaignId, onCampaignChange]);
+    }, [currentCampaignId]); // Only depend on currentCampaignId, not onCampaignChange
+
+    // Don't automatically call onCampaignChange when initializing
+    // This was causing a loop
 
     if (loading) {
         return (
