@@ -22,11 +22,15 @@ import {
     subDays,
     isSameMonth,
     isSameWeek,
-    differenceInCalendarDays
+    differenceInCalendarDays,
+    isBefore,
+    isAfter
 } from 'date-fns';
 import { formatTime, formatTimeRange } from '@/utils/dateTimeFormatter';
 import { daysInWeek } from 'date-fns/constants';
-import GroupAvailability from "@/app/components/GroupAvailability.tsx";
+import SessionList from "@/app/components/SessionList";
+import TimeSlotCell from "@/app/components/TimeSlotCell";
+import MobileCellWithTooltip from "@/app/components/MobileCellWithTooltip";
 
 // Zoom level configurations for different views
 const ZOOM_LEVELS = {
@@ -69,6 +73,8 @@ interface DateCalendarProps {
     fetchAllUsersAvailability?: (startDate: string, endDate: string) => Promise<void>;
     fetchScheduledSessions?: (startDate: string, endDate: string) => Promise<void>;
     timeFormat?: '12h' | '24h';
+    maxPreviousSessions?: number;
+    maxFutureSessions?: number;
 }
 
 export default function DateCalendar({
@@ -83,7 +89,10 @@ export default function DateCalendar({
                                          onScheduleSession,
                                          fetchAllUsersAvailability,
                                          fetchScheduledSessions,
-                                         timeFormat = '12h'
+                                         timeFormat = '12h',
+                                         maxPreviousSessions = 3,
+                                         maxFutureSessions = 5,
+
                                      }: DateCalendarProps) {
     // Calendar state
     const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
@@ -122,17 +131,29 @@ export default function DateCalendar({
     const getDaysForView = useCallback(() => {
         switch (zoomLevel) {
             case ZOOM_LEVELS.OUT:
-                // 2-week view (14 days)
-                return eachDayOfInterval({
-                    start: startOfWeek(currentWeekStart, {weekStartsOn: 1}),
-                    end: endOfWeek(addWeeks(currentWeekStart, 1), {weekStartsOn: 1})
-                });
+                // 2-week view showing Monday through Sunday for two consecutive weeks
+                const weekStart = startOfWeek(currentWeekStart, {weekStartsOn: 1});
+                const twoWeekPeriod = [];
+
+                // Add first week (Mon-Sun)
+                for (let i = 0; i < 7; i++) {
+                    twoWeekPeriod.push(addDays(weekStart, i));
+                }
+
+                // Add second week (Mon-Sun)
+                for (let i = 7; i < 14; i++) {
+                    twoWeekPeriod.push(addDays(weekStart, i));
+                }
+
+                return twoWeekPeriod;
+
             case ZOOM_LEVELS.IN:
                 // 3-day view centered on current day
-                const middleDay = currentWeekStart;
-                const dayBefore = subDays(middleDay, 1);
-                const dayAfter = addDays(middleDay, 1);
-                return [dayBefore, middleDay, dayAfter];
+                return [
+                    subDays(currentWeekStart, 1),
+                    currentWeekStart,
+                    addDays(currentWeekStart, 1),
+                ];
             case ZOOM_LEVELS.NORMAL:
             default:
                 // 1-week view (default)
@@ -326,10 +347,33 @@ export default function DateCalendar({
     };
 
     // Format the current view's date range for display
+    // Format the current view's date range for display
+    // Format the current view's date range for display
     const formatDateRange = () => {
         const firstDay = daysInView[0];
         const lastDay = daysInView[daysInView.length - 1];
 
+        // Special handling for 2-week view
+        if (zoomLevel === ZOOM_LEVELS.OUT) {
+            // Find first day of second week (usually the 8th day)
+            const secondWeekStart = daysInView[7];
+
+            if (isSameMonth(firstDay, lastDay)) {
+                // All days in the same month
+                return `${format(firstDay, 'MMM d')} - ${format(lastDay, 'd, yyyy')}`;
+            } else if (isSameMonth(firstDay, secondWeekStart) && !isSameMonth(secondWeekStart, lastDay)) {
+                // Second week is in a different month than first week
+                return `${format(firstDay, 'MMM d')} - ${format(secondWeekStart, 'd')} / ${format(secondWeekStart, 'MMM d')} - ${format(lastDay, 'd, yyyy')}`;
+            } else if (!isSameMonth(firstDay, secondWeekStart) && isSameMonth(secondWeekStart, lastDay)) {
+                // First week spans two months
+                return `${format(firstDay, 'MMM d')} - ${format(secondWeekStart, 'MMM d')} - ${format(lastDay, 'd, yyyy')}`;
+            } else {
+                // Spans three different months
+                return `${format(firstDay, 'MMM d, yyyy')} - ${format(lastDay, 'MMM d, yyyy')}`;
+            }
+        }
+
+        // Standard formatting for other views
         if (isSameMonth(firstDay, lastDay)) {
             return `${format(firstDay, 'MMM d')} - ${format(lastDay, 'd, yyyy')}`;
         } else if (isSameYear(firstDay, lastDay)) {
@@ -411,20 +455,28 @@ export default function DateCalendar({
     };
 
     // Handle mouse enter during drag
+// Handle mouse enter during drag
     const handleMouseEnter = (date: Date, hour: number) => {
         // Set hovered cell for tooltip/preview
         setHoveredDay(date);
         setHoveredTimeSlot(hour);
 
         // Continue drag operation if active
-        if (isDragging && dragState !== null) {
+        if (isDragging && dragValue !== null) {
             // Don't allow dragging in the past
             if (isPastDate(date) || (isToday(date) && new Date().getHours() >= hour)) {
                 return;
             }
 
-            // Toggle to the same state as drag start
-            toggleAvailability(date, hour, dragState);
+            // Toggle to the drag value
+            const dateStr = format(date, 'yyyy-MM-dd');
+            const key = `${dateStr}-${hour}`;
+            const currentValue = !!availability[key];
+
+            // Only toggle if different from current drag state
+            if (currentValue !== dragValue) {
+                toggleAvailability(date, hour, dragValue);
+            }
         }
     };
 
@@ -455,8 +507,8 @@ export default function DateCalendar({
         // Start dragging
         setIsDragging(true);
 
-        // Toggle the cell
-        toggleAvailability(date, hour);
+        // Toggle the starting cell immediately
+        toggleAvailability(date, hour, !currentValue);
     };
 
     const handleDragOver = (date: Date, hour: number) => {
@@ -588,29 +640,47 @@ export default function DateCalendar({
     };
 
     // Get availability summary for a date (for mini calendar)
+    // Get availability summary for a date (for mini calendar)
     const getDateAvailabilitySummary = (date: Date) => {
         const dateStr = format(date, 'yyyy-MM-dd');
-        let totalAvailable = 0;
-        let totalSlots = 0;
+        const userCount = Object.keys(allUsers).length;
 
+        // If no users or no availability data, return 0
+        if (userCount === 0 || Object.keys(allUsersAvailability).length === 0) {
+            return 0;
+        }
+
+        // For each time slot, calculate the ratio of users available
+        const slotOverlapScores: number[] = [];
+
+        // Loop through each time slot
         timeSlots.forEach(hour => {
             const key = `${dateStr}-${hour}`;
             let usersAvailable = 0;
 
+            // Count users available for this slot
             Object.keys(allUsers).forEach(username => {
                 if (allUsersAvailability[username]?.[key]) {
                     usersAvailable++;
                 }
             });
 
+            // Calculate overlap score for this slot (percentage of users available)
+            const overlapScore = usersAvailable / userCount;
+
+            // Only include slots where at least one user is available
             if (usersAvailable > 0) {
-                totalAvailable += usersAvailable;
-                totalSlots += Object.keys(allUsers).length;
+                slotOverlapScores.push(overlapScore);
             }
         });
 
-        if (totalSlots === 0) return 0;
-        return totalAvailable / totalSlots;
+        // If no slots have any availability, return 0
+        if (slotOverlapScores.length === 0) {
+            return 0;
+        }
+
+        // Return the average overlap score across all slots with any availability
+        return slotOverlapScores.reduce((sum, score) => sum + score, 0) / slotOverlapScores.length;
     };
 
     // Get color for date in mini calendar
@@ -692,6 +762,7 @@ export default function DateCalendar({
     // Render selected time slot details or hovered time slot preview
     // Replace the renderTimeSlotDetails function in DateCalendar.tsx
 
+    // Render selected time slot details or hovered time slot preview
     const renderTimeSlotDetails = () => {
         if (!selectedTimeSlot) return null;
 
@@ -714,7 +785,7 @@ export default function DateCalendar({
                     <div className="p-3 mb-3 bg-indigo-100 dark:bg-indigo-900/30 border-l-4 border-indigo-500 text-indigo-700 dark:text-indigo-300">
                         <div className="font-medium">Scheduled Session: {session.title}</div>
                         <div className="text-sm">
-                            {formatTime(session.startTime)} - {formatTime(session.endTime)}
+                            {formatTime(session.startTime, timeFormat)} - {formatTime(session.endTime, timeFormat)}
                             {session.notes && <p className="mt-1">{session.notes}</p>}
                         </div>
                     </div>
@@ -762,7 +833,6 @@ export default function DateCalendar({
                     <div className="mt-4">
                         <button
                             onClick={() => {
-                                // We need to ensure this function exists and is working
                                 console.log("Scheduling session for", date);
                                 if (onScheduleSession) {
                                     onScheduleSession(date);
@@ -776,6 +846,57 @@ export default function DateCalendar({
                         </button>
                     </div>
                 )}
+            </div>
+        );
+    };
+
+    // Create a utility function to render time slot tooltip
+    const renderTimeSlotTooltip = (date: Date, hour: number) => {
+        const { availableUsers, unavailableUsers } = getUsersAvailability(date, hour);
+        const timeLabel = `${format(date, 'EEE, MMM d')} at ${displayTime(hour)}`;
+
+        return (
+            <div className="absolute z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 w-64 transition-opacity">
+                <div className="mb-1 font-medium text-gray-700 dark:text-gray-300">
+                    {timeLabel}
+                </div>
+                <div className="mb-1 font-medium text-gray-700 dark:text-gray-300">
+                    Available: {availableUsers.length}/{availableUsers.length + unavailableUsers.length}
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                    <div>
+                        <h4 className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">Available</h4>
+                        {availableUsers.length > 0 ? (
+                            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                                {availableUsers.map(user => (
+                                    <li key={user} className="flex items-center">
+                                        <span className="h-2 w-2 bg-green-500 rounded-full mr-2"></span>
+                                        {user}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-gray-500 dark:text-gray-400">No one available</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <h4 className="text-sm font-medium text-red-600 dark:text-red-400 mb-1">Unavailable</h4>
+                        {unavailableUsers.length > 0 ? (
+                            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                                {unavailableUsers.map(user => (
+                                    <li key={user} className="flex items-center">
+                                        <span className="h-2 w-2 bg-red-500 rounded-full mr-2"></span>
+                                        {user}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Everyone available!</p>
+                        )}
+                    </div>
+                </div>
             </div>
         );
     };
@@ -872,26 +993,23 @@ export default function DateCalendar({
                                         const isSelected = daysInView.some(day => isSameDay(day, date));
                                         const isCurrentDay = isToday(date);
                                         const hasSession = hasScheduledSession(date);
-                                        // Always show color for days with availability data
-                                        const dateColor = getDateColor(date);
+
+                                        // Force a calculation of the date color
+                                        const dateColorClass = getDateColor(date);
 
                                         return (
                                             <button
                                                 key={index}
                                                 onClick={() => goToDate(date)}
                                                 disabled={isPastDate(date) || date > addWeeks(new Date(), maxWeeks)}
-                                                className={`p-1 rounded-full text-sm relative ${
-                                                    isCurrentMonth ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'
-                                                } ${
-                                                    isSelected ? 'bg-indigo-100 dark:bg-indigo-900/30' : ''
-                                                } ${
-                                                    dateColor
-                                                } ${
-                                                    isCurrentDay ? 'font-bold ring-2 ring-indigo-500 dark:ring-indigo-400' : ''
-                                                } ${
-                                                    isPastDate(date) || date > addWeeks(new Date(), maxWeeks) ?
-                                                        'opacity-50 cursor-not-allowed' :
-                                                        'hover:bg-gray-200 dark:hover:bg-gray-700'
+                                                className={`p-1 rounded-full text-sm relative flex items-center justify-center 
+                                                ${isCurrentMonth ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}
+                                                ${isSelected ? 'bg-indigo-100 dark:bg-indigo-900/30' : ''}
+                                                ${dateColorClass !== '' ? dateColorClass : ''}
+                                                ${isCurrentDay ? 'font-bold ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}
+                                                ${isPastDate(date) || date > addWeeks(new Date(), maxWeeks) ?
+                                                    'opacity-50 cursor-not-allowed' :
+                                                    'hover:bg-gray-200 dark:hover:bg-gray-700'
                                                 }`}
                                             >
                                                 {format(date, 'd')}
@@ -921,7 +1039,7 @@ export default function DateCalendar({
 
                 {/* Zoom Controls */}
                 <div className="flex items-center mt-2 sm:mt-0">
-                    <div className="flex border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
+                    <div className="flex border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden mx-auto sm:mx-0">
                         <button
                             onClick={() => handleZoomChange(ZOOM_LEVELS.OUT)}
                             className={`px-3 py-1 text-xs sm:text-sm ${
@@ -963,8 +1081,14 @@ export default function DateCalendar({
             </div>
 
             {/* Desktop View - Calendar Grid */}
-            <div className="hidden md:block overflow-x-auto">
-                <div ref={calendarRef} className="grid grid-cols-8 min-w-max">
+            {/* Desktop View - Calendar Grid */}
+            <div className="hidden md:block overflow-x-auto pb-2" style={{
+                scrollbarWidth: 'thin',
+                scrollbarColor: 'rgba(156, 163, 175, 0.5) transparent'
+            }}>
+                <div ref={calendarRef} className="grid grid-cols-8 min-w-max" style={{
+                    width: zoomLevel === ZOOM_LEVELS.OUT ? 'max-content' : '100%'
+                }}>
                     {/* Header row */}
                     <div
                         className="p-3 border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 font-medium"></div>
@@ -982,6 +1106,7 @@ export default function DateCalendar({
                         </div>
                     ))}
 
+                    {/* Time slots */}
                     {/* Time slots */}
                     {timeSlots.map((hour) => (
                         <React.Fragment key={`hour-${hour}`}>
@@ -1002,36 +1127,26 @@ export default function DateCalendar({
                                 const isHovered = hoveredDay && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
 
                                 return (
-                                    <div
+                                    <TimeSlotCell
                                         key={key}
-                                        data-time-slot={`${dateStr}-${hour}`}
-                                        className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center 
-                                            ${!isPast ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}
-                                            ${isAvailable ? 'bg-green-50 dark:bg-green-900/20' : ''}
-                                            ${isToday(day) ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}
-                                            ${session ? 'bg-indigo-100 dark:bg-indigo-900/30 border-l-4 border-indigo-500' : ''}
-                                            ${availabilityColor}
-                                            ${isSelected ? 'ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}
-                                            ${isHovered ? 'ring-2 ring-gray-400 dark:ring-gray-500' : ''}
-                                        `}
-                                        onClick={() => !isPast && handleTimeSlotClick(day, hour)}
-                                        onMouseDown={(e) => !isPast && handleDragStart(day, hour, e)}
-                                        onMouseEnter={() => !isPast && handleDragOver(day, hour)}
+                                        day={day}
+                                        hour={hour}
+                                        dateStr={dateStr}
+                                        isAvailable={isAvailable}
+                                        isPast={isPast}
+                                        availabilityColor={availabilityColor}
+                                        isSelected={isSelected}
+                                        isHovered={isHovered}
+                                        count={count}
+                                        total={total}
+                                        session={session}
+                                        onTimeSlotClick={handleTimeSlotClick}
+                                        onDragStart={handleDragStart}
+                                        onMouseEnter={handleMouseEnter}
                                         onMouseLeave={handleMouseLeave}
-                                    >
-                                        <div className="flex flex-col items-center">
-                                            {isAvailable ?
-                                                <span
-                                                    className="h-6 w-6 rounded-full bg-green-500 text-white flex items-center justify-center">✓</span>
-                                                :
-                                                <span
-                                                    className="h-6 w-6 rounded-full bg-gray-200 dark:bg-gray-600"></span>
-                                            }
-                                            <span className="text-xs text-gray-700 dark:text-gray-300 mt-1">
-                                                {count}/{total} {session && `• ${session.title}`}
-                                            </span>
-                                        </div>
-                                    </div>
+                                        getAvailableUsers={getUsersAvailability}
+                                        displayTime={displayTime}
+                                    />
                                 );
                             })}
                         </React.Fragment>
@@ -1039,6 +1154,7 @@ export default function DateCalendar({
                 </div>
             </div>
 
+            {/* Mobile View - Collapsible Days */}
             {/* Mobile View - Collapsible Days */}
             <div className="md:hidden">
                 {daysInView.map((day) => {
@@ -1119,19 +1235,22 @@ export default function DateCalendar({
                                         const {count, total} = countAvailableUsers(day, hour);
                                         const session = getScheduledSession(day, hour);
                                         const isSelected = selectedTimeSlot === key;
+                                        const { availableUsers, unavailableUsers } = getUsersAvailability(day, hour);
 
                                         return (
-                                            <div
+                                            <MobileCellWithTooltip
                                                 key={key}
-                                                data-time-slot={`${dateStr}-${hour}`}
-                                                className={`p-3 flex justify-between items-center
-                                                    ${!isPast ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}
-                                                    ${isAvailable ? 'bg-green-50 dark:bg-green-900/20' : ''}
-                                                    ${session ? 'bg-indigo-100 dark:bg-indigo-900/30 border-l-4 border-indigo-500' : ''}
-                                                    ${getAvailabilityColor(count, total)}
-                                                    ${isSelected ? 'ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}
-                                                `}
-                                                onClick={() => !isPast && handleTimeSlotClick(day, hour)}
+                                                day={day}
+                                                hour={hour}
+                                                dateStr={dateStr}
+                                                isAvailable={isAvailable}
+                                                isPast={isPast}
+                                                availabilityColor={getAvailabilityColor(count, total)}
+                                                isSelected={isSelected}
+                                                count={count}
+                                                total={total}
+                                                session={session}
+                                                onCellClick={() => !isPast && handleTimeSlotClick(day, hour)}
                                                 onTouchStart={(e) => {
                                                     if (!isPast) {
                                                         e.preventDefault();
@@ -1158,26 +1277,10 @@ export default function DateCalendar({
                                                         }
                                                     }
                                                 }}
-                                            >
-                                                <div className="flex items-center">
-                                                    <span className="text-gray-700 dark:text-gray-300">{displayTime(hour)}</span>
-                                                    {session && (
-                                                        <span className="ml-2 text-sm text-indigo-600 dark:text-indigo-400">
-                                                            {session.title}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center">
-                                                    <span className="text-sm text-gray-500 dark:text-gray-400 mr-2">
-                                                        {count}/{total}
-                                                    </span>
-                                                    <span className={`h-6 w-6 rounded-full flex items-center justify-center ${
-                                                        isAvailable ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-600'
-                                                    }`}>
-                                                        {isAvailable ? '✓' : ''}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                                availableUsers={getUsersAvailability(day, hour).availableUsers}
+                                                unavailableUsers={getUsersAvailability(day, hour).unavailableUsers}
+                                                displayTime={(h) => formatTime(h, timeFormat)}
+                                            />
                                         );
                                     })}
                                 </div>
@@ -1187,20 +1290,15 @@ export default function DateCalendar({
                 })}
             </div>
 
-            <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
-                <GroupAvailability
-                    allUsersAvailability={allUsersAvailability}
-                    days={daysInView.map(day => format(day, 'yyyy-MM-dd'))}
-                    timeSlots={timeSlots.filter(Number.isInteger)} // Only use full hours for group view
-                    isAdmin={isAdmin}
-                    onScheduleSession={(dateStr) => {
-                        if (onScheduleSession) {
-                            const date = parseISO(dateStr);
-                            onScheduleSession(date);
-                        }
-                    }}
-                    timeFormat={timeFormat}
+            <div className="mt-8">
+                <SessionList
                     campaignId={campaignId}
+                    scheduledSessions={scheduledSessions}
+                    timeFormat={timeFormat}
+                    onScheduleNewSession={isAdmin && onScheduleSession ? () => onScheduleSession(new Date()) : undefined}
+                    isAdmin={isAdmin}
+                    maxPreviousSessions={maxPreviousSessions}
+                    maxFutureSessions={maxFutureSessions}
                 />
             </div>
         </div>

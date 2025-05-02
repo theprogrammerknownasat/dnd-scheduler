@@ -3,9 +3,9 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IAvailability extends Document {
     username: string;
-    campaignId: string; // Add campaignId field
+    campaignId: string;
     date: Date;
-    timeSlots: Record<number, boolean>;
+    timeSlots: Record<string, boolean>; // Changed from number to string to support half-hour slots
     createdAt: Date;
     updatedAt: Date;
 }
@@ -13,7 +13,7 @@ export interface IAvailability extends Document {
 const AvailabilitySchema: Schema = new Schema(
     {
         username: { type: String, required: true },
-        campaignId: { type: String, required: true }, // Add campaignId field
+        campaignId: { type: String, required: true },
         date: { type: Date, required: true },
         timeSlots: { type: Map, of: Boolean, default: {} },
     },
