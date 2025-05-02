@@ -25,6 +25,12 @@ export default function Profile() {
 
     const router = useRouter();
 
+    const [sessionDisplay, setSessionDisplay] = useState({
+        maxPreviousSessions: 3,
+        maxFutureSessions: 5
+    });
+
+    // Fetch user profile on component mount
     // Fetch user profile on component mount
     useEffect(() => {
         const fetchProfile = async () => {
@@ -53,6 +59,21 @@ export default function Profile() {
                     setDisplayName(profileData.profile.displayName || '');
                     setUse24HourFormat(profileData.profile.use24HourFormat || false);
                     setDisplayNameEditDisabled(profileData.profile.displayNameEditDisabled || false);
+
+                    // Set session display preferences if available
+                    if (profileData.profile.maxPreviousSessions !== undefined) {
+                        setSessionDisplay(prev => ({
+                            ...prev,
+                            maxPreviousSessions: profileData.profile.maxPreviousSessions
+                        }));
+                    }
+
+                    if (profileData.profile.maxFutureSessions !== undefined) {
+                        setSessionDisplay(prev => ({
+                            ...prev,
+                            maxFutureSessions: profileData.profile.maxFutureSessions
+                        }));
+                    }
                 }
 
                 // Fetch settings (for display name editing restrictions)
@@ -77,6 +98,33 @@ export default function Profile() {
 
         fetchProfile();
     }, [router]);
+
+    const handleUpdateSessionDisplay = async () => {
+        try {
+            setError('');
+            setSuccess('');
+
+            const response = await fetch('/api/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    maxPreviousSessions: sessionDisplay.maxPreviousSessions,
+                    maxFutureSessions: sessionDisplay.maxFutureSessions
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setSuccess('Session display preferences updated successfully!');
+            } else {
+                setError(data.error || 'Failed to update session display preferences');
+            }
+        } catch (err) {
+            console.error('Error updating session display preferences:', err);
+            setError('An error occurred. Please try again.');
+        }
+    };
 
     // Handle display name update
     const handleUpdateDisplayName = async () => {
@@ -255,6 +303,73 @@ export default function Profile() {
                                     ? 'Display name editing has been disabled by the administrator'
                                     : 'This is how your name will appear to others'}
                             </p>
+                        </div>
+
+                        {/* Session Display Preferences */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Session Display Preferences
+                            </label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="maxPreviousSessions" className="block text-sm text-gray-700 dark:text-gray-300">
+                                        Previous Sessions to Display
+                                    </label>
+                                    <div className="mt-1 flex">
+                                        <input
+                                            type="number"
+                                            id="maxPreviousSessions"
+                                            name="maxPreviousSessions"
+                                            min="1"
+                                            max="10"
+                                            value={sessionDisplay.maxPreviousSessions}
+                                            onChange={(e) => setSessionDisplay({
+                                                ...sessionDisplay,
+                                                maxPreviousSessions: parseInt(e.target.value) || 3
+                                            })}
+                                            className="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded
+                                            bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        />
+                                        <span className="ml-2 text-sm text-gray-500 dark:text-gray-400 my-auto">
+                                            previous sessions
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label htmlFor="maxFutureSessions" className="block text-sm text-gray-700 dark:text-gray-300">
+                                        Future Sessions to Display
+                                    </label>
+                                    <div className="mt-1 flex">
+                                        <input
+                                            type="number"
+                                            id="maxFutureSessions"
+                                            name="maxFutureSessions"
+                                            min="1"
+                                            max="10"
+                                            value={sessionDisplay.maxFutureSessions}
+                                            onChange={(e) => setSessionDisplay({
+                                                ...sessionDisplay,
+                                                maxFutureSessions: parseInt(e.target.value) || 5
+                                            })}
+                                            className="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded
+                                            bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        />
+                                        <span className="ml-2 text-sm text-gray-500 dark:text-gray-400 my-auto">
+                                            upcoming sessions
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mt-2">
+                                <button
+                                    onClick={handleUpdateSessionDisplay}
+                                    className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700
+                                    dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                                >
+                                    Save Display Settings
+                                </button>
+                            </div>
                         </div>
 
                         {/* Time Format Preference */}

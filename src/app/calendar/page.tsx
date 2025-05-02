@@ -120,6 +120,11 @@ export default function Calendar() {
         [currentCampaignId] // Re-create when campaignId changes
     );
 
+    const [userPreferences, setUserPreferences] = useState({
+        maxPreviousSessions: 3,
+        maxFutureSessions: 5
+    });
+
     // Fetch user info and campaigns
     useEffect(() => {
         const fetchUserAndCampaigns = async () => {
@@ -426,6 +431,32 @@ export default function Calendar() {
         // This effect should run whenever the campaign changes or the data version changes
     }, [currentCampaignId, campaignDataVersion]);
 
+    useEffect(() => {
+        const fetchUserProfile = async () => {
+            try {
+                const profileResponse = await fetch('/api/profile');
+                const profileData = await profileResponse.json();
+
+                if (profileData.success && profileData.profile) {
+                    // Update preferences if they exist
+                    const updatedPreferences = { ...userPreferences };
+                    if (profileData.profile.maxPreviousSessions !== undefined) {
+                        updatedPreferences.maxPreviousSessions = profileData.profile.maxPreviousSessions;
+                    }
+                    if (profileData.profile.maxFutureSessions !== undefined) {
+                        updatedPreferences.maxFutureSessions = profileData.profile.maxFutureSessions;
+                    }
+
+                    setUserPreferences(updatedPreferences);
+                }
+            } catch (error) {
+                console.error('Error fetching user profile:', error);
+            }
+        };
+
+        fetchUserProfile();
+    }, []);
+
     const memoizedCampaignId = React.useMemo(() => currentCampaignId, [currentCampaignId]);
 
     const getAnnouncementClasses = () => {
@@ -511,6 +542,8 @@ export default function Calendar() {
                 fetchAllUsersAvailability={fetchAllUsersAvailability}
                 fetchScheduledSessions={fetchScheduledSessions}
                 timeFormat={timeFormat}
+                maxPreviousSessions={userPreferences.maxPreviousSessions}
+                maxFutureSessions={userPreferences.maxFutureSessions}
                 key={`${currentCampaignId}-${campaignDataVersion}`} // Add a key to force re-render when campaign changes
             />
 
