@@ -66,12 +66,12 @@ export default function PollComponent({ campaignId }: PollComponentProps) {
     }, [campaignId]);
 
     // Handle voting
-    const handleVote = async (pollId: string, option: string) => {
+    const handleVote = async (pollId: string, option: string, campaignId: string) => {
         try {
             const response = await fetch('/api/polls/vote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pollId, option }),
+                body: JSON.stringify({ pollId, option, campaignId }),
             });
 
             const data = await response.json();
@@ -101,33 +101,57 @@ export default function PollComponent({ campaignId }: PollComponentProps) {
     };
 
     // Generate poll results visualization
+    // Generate poll results visualization
     const PollResults = ({ poll }: { poll: Poll }) => {
-        // Don't show results for blind polls unless admin
-        if (poll.isBlind && !isAdmin && !poll.votes[username]) {
-            return (
-                <div className="text-center text-gray-500 dark:text-gray-400 my-4">
-                    <p>This is a blind poll. Results will be hidden until you vote.</p>
-                </div>
-            );
-        }
-
-        // Don't show results for blind polls until user votes
-        if (poll.isBlind && !isAdmin && !getUserVote(poll)) {
-            return (
-                <div className="text-center text-gray-500 dark:text-gray-400 my-4">
-                    <p>Results will be visible after you vote</p>
-                </div>
-            );
-        }
-
+        const userVote = getUserVote(poll);
         const totalVotes = Object.keys(poll.votes).length;
 
+        // For blind polls, only show which option the user voted for
+        if (poll.isBlind && !isAdmin) {
+            if (!userVote) {
+                return (
+                    <div className="text-center text-gray-500 dark:text-gray-400 my-4">
+                        <p>This is a blind poll. Vote to see which option you selected.</p>
+                    </div>
+                );
+            }
+
+            // For non-admin users who have voted, only show their vote without percentages
+            return (
+                <div className="space-y-2 mt-4">
+                    {poll.options.map(option => {
+                        return (
+                            <div
+                                key={option}
+                                className={`p-3 border rounded-md cursor-pointer ${
+                                    userVote === option ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/20' : 'border-gray-200 dark:border-gray-700'
+                                }`}
+                                onClick={() => handleVote(poll._id, option, campaignId)}
+                            >
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-900 dark:text-white">{option}</span>
+                                    {userVote === option && (
+                                        <span className="text-sm text-indigo-600 dark:text-indigo-400 font-medium">
+                                            Your vote
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic text-center mt-2">
+                        Results are hidden for blind polls
+                    </p>
+                </div>
+            );
+        }
+
+        // For admins or non-blind polls, show full results with percentages
         return (
             <div className="space-y-2 mt-4">
                 {poll.options.map(option => {
                     const votes = countVotes(poll, option);
                     const percentage = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
-                    const userVote = getUserVote(poll);
 
                     return (
                         <div
@@ -135,7 +159,7 @@ export default function PollComponent({ campaignId }: PollComponentProps) {
                             className={`p-3 border rounded-md cursor-pointer ${
                                 userVote === option ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/20' : 'border-gray-200 dark:border-gray-700'
                             }`}
-                            onClick={() => handleVote(poll._id, option)}
+                            onClick={() => handleVote(poll._id, option, campaignId)}
                         >
                             <div className="flex justify-between items-center mb-1">
                                 <span className="text-gray-900 dark:text-white">{option}</span>
@@ -152,6 +176,11 @@ export default function PollComponent({ campaignId }: PollComponentProps) {
                         </div>
                     );
                 })}
+                {poll.isBlind && isAdmin && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic text-center">
+                        Admin view: you can see all results for this blind poll
+                    </p>
+                )}
             </div>
         );
     };

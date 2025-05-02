@@ -162,6 +162,7 @@ export default function Calendar() {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     name: 'Default Campaign',
+                                    isDefault: true,
                                     description: 'Automatically created default campaign'
                                 }),
                             });

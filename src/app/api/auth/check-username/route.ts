@@ -1,3 +1,4 @@
+// src/app/api/auth/check-username/route.ts
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import User from '@/models/User';

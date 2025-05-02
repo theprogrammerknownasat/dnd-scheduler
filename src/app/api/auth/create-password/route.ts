@@ -1,3 +1,4 @@
+// src/app/api/auth/create-password/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import dbConnect from '@/lib/mongodb';

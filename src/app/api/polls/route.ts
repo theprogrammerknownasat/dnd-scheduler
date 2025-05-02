@@ -5,7 +5,7 @@ import dbConnect from '@/lib/mongodb';
 import Poll from '@/models/Poll';
 
 // Get all polls
-export async function GET() {
+export async function GET(request: Request) {
     try {
         const cookieStore = await cookies();
         const username = cookieStore.get('user')?.value;
@@ -17,10 +17,23 @@ export async function GET() {
             );
         }
 
+        const { searchParams } = new URL(request.url);
+        const campaignId = searchParams.get('campaignId');
+
+        if (!campaignId) {
+            return NextResponse.json(
+                { success: false, error: 'Campaign ID is required' },
+                { status: 400 }
+            );
+        }
+
         await dbConnect();
 
-        // Get all active polls
-        const polls = await Poll.find({ isActive: true }).sort({ createdAt: -1 });
+        // Get all active polls for the specified campaign
+        const polls = await Poll.find({
+            isActive: true,
+            campaignId: campaignId
+        }).sort({ createdAt: -1 });
 
         return NextResponse.json({
             success: true,
@@ -56,11 +69,11 @@ export async function POST(request: Request) {
             );
         }
 
-        const { question, options, isBlind } = await request.json();
+        const { question, options, isBlind, campaignId } = await request.json();
 
-        if (!question || !options || options.length < 2) {
+        if (!question || !options || options.length < 2 || !campaignId) {
             return NextResponse.json(
-                { success: false, error: 'Question and at least 2 options are required' },
+                { success: false, error: 'Question, campaign ID, and at least 2 options are required' },
                 { status: 400 }
             );
         }
@@ -69,6 +82,7 @@ export async function POST(request: Request) {
 
         // Create new poll
         await Poll.create({
+            campaignId,
             question,
             options,
             votes: {},
@@ -101,15 +115,25 @@ export async function DELETE(request: Request) {
 
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+        const campaignId = searchParams.get('campaignId');
 
-        if (!id) {
+        if (!id || !campaignId) {
             return NextResponse.json(
-                { success: false, error: 'Poll ID is required' },
+                { success: false, error: 'Poll ID and Campaign ID are required' },
                 { status: 400 }
             );
         }
 
         await dbConnect();
+
+        // Verify poll belongs to the given campaign
+        const poll = await Poll.findById(id);
+        if (!poll || poll.campaignId !== campaignId) {
+            return NextResponse.json(
+                { success: false, error: 'Poll not found in this campaign' },
+                { status: 404 }
+            );
+        }
 
         await Poll.findByIdAndDelete(id);
 

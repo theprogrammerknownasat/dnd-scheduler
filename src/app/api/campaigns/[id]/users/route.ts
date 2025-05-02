@@ -1,3 +1,4 @@
+// src/app/api/campaigns/[id]/users/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import dbConnect from '@/lib/mongodb';
@@ -10,6 +11,7 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
+        // Make sure to await params.id
         const id = params.id;
         const cookieStore = await cookies();
         const username = cookieStore.get('user')?.value;
