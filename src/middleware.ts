@@ -1,9 +1,8 @@
-// src/middleware.ts (updated to handle setup-profile)
+// src/middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { updateActiveUser } from './app/api/admin/active-users/route';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
     const currentUser = request.cookies.get('user')?.value;
     const isAdmin = request.cookies.get('isAdmin')?.value === 'true';
 
@@ -17,11 +16,6 @@ export function middleware(request: NextRequest) {
     const setupAllowedPaths = ['/setup-profile'];
 
     const path = request.nextUrl.pathname;
-
-    // Update active user status
-    if (currentUser) {
-        updateActiveUser(currentUser);
-    }
 
     // Check if the path is in the admin-only paths
     const isAdminPath = adminPaths.some(ap => path.startsWith(ap));

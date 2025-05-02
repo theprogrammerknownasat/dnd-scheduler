@@ -10,6 +10,23 @@ export const metadata: Metadata = {
     description: 'Scheduling app for D&D sessions',
 };
 
+const initializeDatabase = async () => {
+    try {
+        const response = await fetch(process.env.NODE_ENV === 'development'
+                ? 'http://localhost:3000/api/init'
+                : `${process.env.NEXT_PUBLIC_API_URL || ''}/api/init`,
+            { cache: 'no-store' });
+
+        const data = await response.json();
+        console.log('Database initialization:', data.message);
+    } catch (error) {
+        console.error('Failed to initialize database:', error);
+    }
+};
+
+// Call the init function in server component
+initializeDatabase();
+
 export default function RootLayout({
                                        children,
                                    }: {

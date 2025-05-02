@@ -128,25 +128,16 @@ export default function DateCalendar({
         : DEFAULT_TIME_SLOTS;
 
     // Generate days based on current zoom level
+    // Generate days based on current zoom level
     const getDaysForView = useCallback(() => {
         switch (zoomLevel) {
             case ZOOM_LEVELS.OUT:
-                // 2-week view showing Monday through Sunday for two consecutive weeks
-                const weekStart = startOfWeek(currentWeekStart, {weekStartsOn: 1});
-                const twoWeekPeriod = [];
-
-                // Add first week (Mon-Sun)
-                for (let i = 0; i < 7; i++) {
-                    twoWeekPeriod.push(addDays(weekStart, i));
-                }
-
-                // Add second week (Mon-Sun)
-                for (let i = 7; i < 14; i++) {
-                    twoWeekPeriod.push(addDays(weekStart, i));
-                }
-
-                return twoWeekPeriod;
-
+                // 2-week view as two stacked weeks
+                // We'll handle the rendering differently rather than changing the days
+                return eachDayOfInterval({
+                    start: startOfWeek(currentWeekStart, {weekStartsOn: 1}),
+                    end: endOfWeek(addWeeks(currentWeekStart, 1), {weekStartsOn: 1})
+                });
             case ZOOM_LEVELS.IN:
                 // 3-day view centered on current day
                 return [
@@ -1065,13 +1056,9 @@ export default function DateCalendar({
                             <span className="sm:hidden">1W</span>
                         </button>
                         <button
-                            onClick={() => handleZoomChange(ZOOM_LEVELS.IN)}
-                            className={`px-3 py-1 text-xs sm:text-sm ${
-                                zoomLevel === ZOOM_LEVELS.IN
-                                    ? 'bg-indigo-500 text-white'
-                                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                            }`}
-                            title="3 Days View"
+                            disabled={true}
+                            className="px-3 py-1 text-xs sm:text-sm bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                            title="3 Days View (Coming Soon)"
                         >
                             <span className="hidden sm:inline">3 Days</span>
                             <span className="sm:hidden">3D</span>
@@ -1082,75 +1069,208 @@ export default function DateCalendar({
 
             {/* Desktop View - Calendar Grid */}
             {/* Desktop View - Calendar Grid */}
-            <div className="hidden md:block overflow-x-auto pb-2" style={{
-                scrollbarWidth: 'thin',
-                scrollbarColor: 'rgba(156, 163, 175, 0.5) transparent'
-            }}>
-                <div ref={calendarRef} className="grid grid-cols-8 min-w-max" style={{
-                    width: zoomLevel === ZOOM_LEVELS.OUT ? 'max-content' : '100%'
-                }}>
-                    {/* Header row */}
-                    <div
-                        className="p-3 border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 font-medium"></div>
-                    {daysInView.map((day) => (
-                        <div
-                            key={format(day, 'yyyy-MM-dd')}
-                            className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center font-medium 
-                                ${isToday(day) ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}
-                        >
-                            <div className="text-gray-500 dark:text-gray-300">{format(day, 'EEE')}</div>
-                            <div
-                                className={`text-lg ${isToday(day) ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-900 dark:text-white'}`}>
-                                {format(day, 'd')}
+            {/* Desktop View - Calendar Grid */}
+            <div className="hidden md:block overflow-x-auto pb-2">
+                <div ref={calendarRef} className={zoomLevel === ZOOM_LEVELS.OUT ? "flex flex-col space-y-4" : "grid grid-cols-8 min-w-max"}>
+                    {zoomLevel === ZOOM_LEVELS.OUT ? (
+                        // 2-week view as stacked weeks
+                        <>
+                            {/* First week */}
+                            <div className="grid grid-cols-8 min-w-max border-b-2 border-gray-300 dark:border-gray-600 pb-4">
+                                <div className="p-3 border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 font-medium">
+                                    Week 1
+                                </div>
+                                {daysInView.slice(0, 7).map((day) => (
+                                    <div
+                                        key={format(day, 'yyyy-MM-dd')}
+                                        className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center font-medium 
+                                            ${isToday(day) ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}
+                                    >
+                                        <div className="text-gray-500 dark:text-gray-300">{format(day, 'EEE')}</div>
+                                        <div
+                                            className={`text-lg ${isToday(day) ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-900 dark:text-white'}`}>
+                                            {format(day, 'd')}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* Time slots for first week */}
+                                {timeSlots.map((hour) => (
+                                    <React.Fragment key={`week1-hour-${hour}`}>
+                                        <div
+                                            className="p-3 border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 font-medium text-gray-700 dark:text-gray-300">
+                                            {displayTime(hour)}
+                                        </div>
+
+                                        {daysInView.slice(0, 7).map((day) => {
+                                            const dateStr = format(day, 'yyyy-MM-dd');
+                                            const key = `${dateStr}-${hour}`;
+                                            const isAvailable = !!availability[key];
+                                            const isPast = isPastDate(day) || (isToday(day) && new Date().getHours() >= hour);
+                                            const {count, total} = countAvailableUsers(day, hour);
+                                            const availabilityColor = getAvailabilityColor(count, total);
+                                            const session = getScheduledSession(day, hour);
+                                            const isSelected = selectedTimeSlot === key;
+                                            const isHovered = hoveredDay && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
+
+                                            return (
+                                                <TimeSlotCell
+                                                    key={key}
+                                                    day={day}
+                                                    hour={hour}
+                                                    dateStr={dateStr}
+                                                    isAvailable={isAvailable}
+                                                    isPast={isPast}
+                                                    availabilityColor={availabilityColor}
+                                                    isSelected={isSelected}
+                                                    isHovered={isHovered}
+                                                    count={count}
+                                                    total={total}
+                                                    session={session}
+                                                    onTimeSlotClick={handleTimeSlotClick}
+                                                    onDragStart={handleDragStart}
+                                                    onMouseEnter={handleMouseEnter}
+                                                    onMouseLeave={handleMouseLeave}
+                                                    getAvailableUsers={getUsersAvailability}
+                                                    displayTime={displayTime}
+                                                />
+                                            );
+                                        })}
+                                    </React.Fragment>
+                                ))}
                             </div>
-                        </div>
-                    ))}
 
-                    {/* Time slots */}
-                    {/* Time slots */}
-                    {timeSlots.map((hour) => (
-                        <React.Fragment key={`hour-${hour}`}>
-                            <div
-                                className="p-3 border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 font-medium text-gray-700 dark:text-gray-300">
-                                {displayTime(hour)}
+                            {/* Second week */}
+                            <div className="grid grid-cols-8 min-w-max">
+                                <div className="p-3 border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 font-medium">
+                                    Week 2
+                                </div>
+                                {daysInView.slice(7, 14).map((day) => (
+                                    <div
+                                        key={format(day, 'yyyy-MM-dd')}
+                                        className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center font-medium 
+                                            ${isToday(day) ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}
+                                    >
+                                        <div className="text-gray-500 dark:text-gray-300">{format(day, 'EEE')}</div>
+                                        <div
+                                            className={`text-lg ${isToday(day) ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-900 dark:text-white'}`}>
+                                            {format(day, 'd')}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* Time slots for second week */}
+                                {timeSlots.map((hour) => (
+                                    <React.Fragment key={`week2-hour-${hour}`}>
+                                        <div
+                                            className="p-3 border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 font-medium text-gray-700 dark:text-gray-300">
+                                            {displayTime(hour)}
+                                        </div>
+
+                                        {daysInView.slice(7, 14).map((day) => {
+                                            const dateStr = format(day, 'yyyy-MM-dd');
+                                            const key = `${dateStr}-${hour}`;
+                                            const isAvailable = !!availability[key];
+                                            const isPast = isPastDate(day) || (isToday(day) && new Date().getHours() >= hour);
+                                            const {count, total} = countAvailableUsers(day, hour);
+                                            const availabilityColor = getAvailabilityColor(count, total);
+                                            const session = getScheduledSession(day, hour);
+                                            const isSelected = selectedTimeSlot === key;
+                                            const isHovered = hoveredDay && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
+
+                                            return (
+                                                <TimeSlotCell
+                                                    key={key}
+                                                    day={day}
+                                                    hour={hour}
+                                                    dateStr={dateStr}
+                                                    isAvailable={isAvailable}
+                                                    isPast={isPast}
+                                                    availabilityColor={availabilityColor}
+                                                    isSelected={isSelected}
+                                                    isHovered={isHovered}
+                                                    count={count}
+                                                    total={total}
+                                                    session={session}
+                                                    onTimeSlotClick={handleTimeSlotClick}
+                                                    onDragStart={handleDragStart}
+                                                    onMouseEnter={handleMouseEnter}
+                                                    onMouseLeave={handleMouseLeave}
+                                                    getAvailableUsers={getUsersAvailability}
+                                                    displayTime={displayTime}
+                                                />
+                                            );
+                                        })}
+                                    </React.Fragment>
+                                ))}
                             </div>
+                        </>
+                    ) : (
+                        // Regular view (1-week or 3-day)
+                        <>
+                            {/* Header row */}
+                            <div
+                                className="p-3 border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 font-medium"></div>
+                            {daysInView.map((day) => (
+                                <div
+                                    key={format(day, 'yyyy-MM-dd')}
+                                    className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center font-medium 
+                                        ${isToday(day) ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}
+                                >
+                                    <div className="text-gray-500 dark:text-gray-300">{format(day, 'EEE')}</div>
+                                    <div
+                                        className={`text-lg ${isToday(day) ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-900 dark:text-white'}`}>
+                                        {format(day, 'd')}
+                                    </div>
+                                </div>
+                            ))}
 
-                            {daysInView.map((day) => {
-                                const dateStr = format(day, 'yyyy-MM-dd');
-                                const key = `${dateStr}-${hour}`;
-                                const isAvailable = !!availability[key];
-                                const isPast = isPastDate(day) || (isToday(day) && new Date().getHours() >= hour);
-                                const {count, total} = countAvailableUsers(day, hour);
-                                const availabilityColor = getAvailabilityColor(count, total);
-                                const session = getScheduledSession(day, hour);
-                                const isSelected = selectedTimeSlot === key;
-                                const isHovered = hoveredDay && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
+                            {/* Time slots */}
+                            {timeSlots.map((hour) => (
+                                <React.Fragment key={`hour-${hour}`}>
+                                    <div
+                                        className="p-3 border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 font-medium text-gray-700 dark:text-gray-300">
+                                        {displayTime(hour)}
+                                    </div>
 
-                                return (
-                                    <TimeSlotCell
-                                        key={key}
-                                        day={day}
-                                        hour={hour}
-                                        dateStr={dateStr}
-                                        isAvailable={isAvailable}
-                                        isPast={isPast}
-                                        availabilityColor={availabilityColor}
-                                        isSelected={isSelected}
-                                        isHovered={isHovered}
-                                        count={count}
-                                        total={total}
-                                        session={session}
-                                        onTimeSlotClick={handleTimeSlotClick}
-                                        onDragStart={handleDragStart}
-                                        onMouseEnter={handleMouseEnter}
-                                        onMouseLeave={handleMouseLeave}
-                                        getAvailableUsers={getUsersAvailability}
-                                        displayTime={displayTime}
-                                    />
-                                );
-                            })}
-                        </React.Fragment>
-                    ))}
+                                    {daysInView.map((day) => {
+                                        const dateStr = format(day, 'yyyy-MM-dd');
+                                        const key = `${dateStr}-${hour}`;
+                                        const isAvailable = !!availability[key];
+                                        const isPast = isPastDate(day) || (isToday(day) && new Date().getHours() >= hour);
+                                        const {count, total} = countAvailableUsers(day, hour);
+                                        const availabilityColor = getAvailabilityColor(count, total);
+                                        const session = getScheduledSession(day, hour);
+                                        const isSelected = selectedTimeSlot === key;
+                                        const isHovered = hoveredDay && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
+
+                                        return (
+                                            <TimeSlotCell
+                                                key={key}
+                                                day={day}
+                                                hour={hour}
+                                                dateStr={dateStr}
+                                                isAvailable={isAvailable}
+                                                isPast={isPast}
+                                                availabilityColor={availabilityColor}
+                                                isSelected={isSelected}
+                                                isHovered={isHovered}
+                                                count={count}
+                                                total={total}
+                                                session={session}
+                                                onTimeSlotClick={handleTimeSlotClick}
+                                                onDragStart={handleDragStart}
+                                                onMouseEnter={handleMouseEnter}
+                                                onMouseLeave={handleMouseLeave}
+                                                getAvailableUsers={getUsersAvailability}
+                                                displayTime={displayTime}
+                                            />
+                                        );
+                                    })}
+                                </React.Fragment>
+                            ))}
+                        </>
+                    )}
                 </div>
             </div>
 
