@@ -102,21 +102,14 @@ export default function PollComponent({ campaignId }: PollComponentProps) {
 
     // Generate poll results visualization
     // Generate poll results visualization
+    // In PollComponent.tsx, update the PollResults component
+
     const PollResults = ({ poll }: { poll: Poll }) => {
         const userVote = getUserVote(poll);
         const totalVotes = Object.keys(poll.votes).length;
 
         // For blind polls, only show which option the user voted for
         if (poll.isBlind && !isAdmin) {
-            if (!userVote) {
-                return (
-                    <div className="text-center text-gray-500 dark:text-gray-400 my-4">
-                        <p>This is a blind poll. Vote to see which option you selected.</p>
-                    </div>
-                );
-            }
-
-            // For non-admin users who have voted, only show their vote without percentages
             return (
                 <div className="space-y-2 mt-4">
                     {poll.options.map(option => {
@@ -132,8 +125,8 @@ export default function PollComponent({ campaignId }: PollComponentProps) {
                                     <span className="text-gray-900 dark:text-white">{option}</span>
                                     {userVote === option && (
                                         <span className="text-sm text-indigo-600 dark:text-indigo-400 font-medium">
-                                            Your vote
-                                        </span>
+                                        Your vote
+                                    </span>
                                     )}
                                 </div>
                             </div>
@@ -164,8 +157,8 @@ export default function PollComponent({ campaignId }: PollComponentProps) {
                             <div className="flex justify-between items-center mb-1">
                                 <span className="text-gray-900 dark:text-white">{option}</span>
                                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                                    {votes} vote{votes !== 1 ? 's' : ''} ({percentage}%)
-                                </span>
+                                {votes} vote{votes !== 1 ? 's' : ''} ({percentage}%)
+                            </span>
                             </div>
                             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                 <div

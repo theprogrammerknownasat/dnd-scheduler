@@ -31,6 +31,7 @@ import { daysInWeek } from 'date-fns/constants';
 import SessionList from "@/app/components/SessionList";
 import TimeSlotCell from "@/app/components/TimeSlotCell";
 import MobileCellWithTooltip from "@/app/components/MobileCellWithTooltip";
+import CurrentTimeIndicator from "@/app/components/CurrentTimeIndicator";
 
 // Zoom level configurations for different views
 const ZOOM_LEVELS = {
@@ -116,6 +117,7 @@ export default function DateCalendar({
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [dragStartCell, setDragStartCell] = useState<string | null>(null);
     const [dragValue, setDragValue] = useState<boolean | null>(null);
+    const [localScheduledSessions, setLocalScheduledSessions] = useState<ScheduledSession[]>([]);
 
     // Refs
     const datePickerRef = useRef<HTMLDivElement>(null);
@@ -225,29 +227,37 @@ export default function DateCalendar({
     }, [selectedTimeSlot, daysInView]);
 
     // Fetch data when view changes
+    // In the DateCalendar.tsx, modify the useEffect that handles data fetching:
+    // In DateCalendar.tsx, modify the useEffect that fetches data
+
+// Update the data fetching effect to handle 2-week view properly
     useEffect(() => {
         if (!campaignId) return;
 
-        // Only fetch data when the view has significantly changed (first day is different)
-        // This prevents repeated fetches for minor UI updates
         const fetchData = async () => {
-            // Store the current days in a ref to prevent re-fetching for the same days
-            if (prevDaysRef.current &&
-                prevDaysRef.current.length > 0 &&
-                daysInView.length > 0 &&
-                format(prevDaysRef.current[0], 'yyyy-MM-dd') === format(daysInView[0], 'yyyy-MM-dd')) {
-                // Skip if first day hasn't changed
-                return;
+            // Calculate start and end dates based on zoom level
+            let startDate, endDate;
+
+            if (zoomLevel === ZOOM_LEVELS.OUT) {
+                // For 2-week view, make sure to get the full range of days
+                startDate = format(startOfWeek(currentWeekStart, {weekStartsOn: 1}), 'yyyy-MM-dd');
+                endDate = format(endOfWeek(addWeeks(currentWeekStart, 1), {weekStartsOn: 1}), 'yyyy-MM-dd');
+                console.log(`Fetching data for 2-week view: ${startDate} to ${endDate}`);
+            } else {
+                // For other views, use the current daysInView
+                startDate = format(daysInView[0], 'yyyy-MM-dd');
+                endDate = format(daysInView[daysInView.length - 1], 'yyyy-MM-dd');
+                console.log(`Fetching data for regular view: ${startDate} to ${endDate}`);
             }
 
-            // Update ref to current days
-            prevDaysRef.current = daysInView;
+            // Store the current date range to prevent re-fetching
+            const dateRangeKey = `${startDate}-${endDate}`;
+            if (prevDateRangeRef.current === dateRangeKey) {
+                return; // Skip if same date range
+            }
+            prevDateRangeRef.current = dateRangeKey;
 
             setIsLoading(true);
-
-            // Format dates for API calls
-            const startDate = format(daysInView[0], 'yyyy-MM-dd');
-            const endDate = format(daysInView[daysInView.length - 1], 'yyyy-MM-dd');
 
             try {
                 // Fetch personal availability
@@ -258,7 +268,7 @@ export default function DateCalendar({
                     setAvailability(data.availability);
                 }
 
-                // Fetch all users' availability and sessions - only if the functions exist
+                // Fetch all users' availability and sessions
                 if (fetchAllUsersAvailability) {
                     await fetchAllUsersAvailability(startDate, endDate);
                 }
@@ -273,13 +283,16 @@ export default function DateCalendar({
             }
         };
 
-        // Fetch data with delay to avoid rapid consecutive fetches
+        // Fetch data with slight delay to avoid rapid consecutive fetches
         const timer = setTimeout(() => {
             fetchData();
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [daysInView, campaignId, fetchAllUsersAvailability, fetchScheduledSessions]);
+    }, [currentWeekStart, campaignId, fetchAllUsersAvailability, fetchScheduledSessions, zoomLevel, daysInView]);
+
+// Add this ref at the top of your component:
+    const prevDateRangeRef = useRef<string>('');
 
     // Change zoom level
     const handleZoomChange = (level: string) => {
@@ -536,17 +549,26 @@ export default function DateCalendar({
     };
 
     // Get color based on availability ratio
-    const getAvailabilityColor = (count: number, total: number) => {
+    const getAvailabilityColor = (count: number, total: number, hasSession = false) => {
+        // If there's a session, always return blue
+        if (hasSession) {
+            return 'bg-blue-200 dark:bg-blue-800/40';
+        }
+
+        // If there are no users, show gray
         if (total === 0) return 'bg-gray-100 dark:bg-gray-700';
 
+        // Calculate percentage of users available
         const percentage = count / total;
 
+        // Color based on percentage ranges
         if (percentage === 0) return 'bg-gray-100 dark:bg-gray-700';
-        if (percentage < 0.25) return 'bg-red-200 dark:bg-red-800';
-        if (percentage < 0.5) return 'bg-yellow-200 dark:bg-yellow-800';
-        if (percentage < 0.75) return 'bg-green-200 dark:bg-green-800';
-        if (percentage < 1) return 'bg-green-300 dark:bg-green-700';
-        return 'bg-green-400 dark:bg-green-600'; // 100%
+        if (percentage < 0.25) return 'bg-red-300 dark:bg-red-800/50';
+        if (percentage < 0.5) return 'bg-orange-300 dark:bg-orange-700/50';
+        if (percentage < 0.75) return 'bg-yellow-300 dark:bg-yellow-600/50';
+        if (percentage < 1) return 'bg-green-400 dark:bg-green-700/50';
+// 100% availability - darkest green to show full agreement
+        return 'bg-green-700 dark:bg-green-900/70';
     };
 
     // Check if a date is in the past
@@ -557,15 +579,46 @@ export default function DateCalendar({
     };
 
     // Check if a time slot has a scheduled session
+
+    // Update the getScheduledSession function to handle ISO format dates
+
     const getScheduledSession = (date: Date, hour: number) => {
+        // If no sessions, return null immediately
+        if (!scheduledSessions || scheduledSessions.length === 0) {
+            return null;
+        }
+
+        // Format the date string for matching with session.date
         const dateStr = format(date, 'yyyy-MM-dd');
 
+        // Ensure hour is a number for comparison
+        const hourNum = typeof hour === 'number' ? hour : parseFloat(hour.toString());
+
+        // Find the session that matches this date and time slot
         return scheduledSessions.find(session => {
-            return session.date === dateStr &&
-                hour >= session.startTime &&
-                hour < session.endTime;
+            // IMPORTANT FIX: Parse the ISO date string to extract just the date part
+            // This handles dates in format "2025-05-03T04:00:00.000Z"
+            const sessionDate = session.date.split('T')[0];
+
+            // Check if the date matches
+            const dateMatches = sessionDate === dateStr;
+
+            // Convert startTime and endTime to numbers if they're strings
+            const startTime = typeof session.startTime === 'number' ?
+                session.startTime : parseFloat(session.startTime.toString());
+
+            const endTime = typeof session.endTime === 'number' ?
+                session.endTime : parseFloat(session.endTime.toString());
+
+            // Check if this hour is within the session's time range
+            const timeInRange = hourNum >= startTime && hourNum < endTime;
+
+            // Both date and time must match
+            return dateMatches && timeInRange;
         });
     };
+
+
 
     // Get list of available and unavailable users for a time slot
     const getUsersAvailability = (date: Date, hour: number) => {
@@ -641,48 +694,45 @@ export default function DateCalendar({
             return 0;
         }
 
+        // Default time slots (8 AM to 10 PM)
+        const slots = Array.from({ length: 15 }, (_, i) => i + 8);
+
         // For each time slot, calculate the ratio of users available
-        const slotOverlapScores: number[] = [];
+        let totalAvailable = 0;
+        let totalSlots = 0;
 
         // Loop through each time slot
-        timeSlots.forEach(hour => {
+        slots.forEach(hour => {
             const key = `${dateStr}-${hour}`;
             let usersAvailable = 0;
 
             // Count users available for this slot
-            Object.keys(allUsers).forEach(username => {
+            Object.keys(allUsersAvailability).forEach(username => {
                 if (allUsersAvailability[username]?.[key]) {
                     usersAvailable++;
                 }
             });
 
-            // Calculate overlap score for this slot (percentage of users available)
-            const overlapScore = usersAvailable / userCount;
-
-            // Only include slots where at least one user is available
-            if (usersAvailable > 0) {
-                slotOverlapScores.push(overlapScore);
-            }
+            totalAvailable += usersAvailable;
+            totalSlots += userCount;
         });
 
-        // If no slots have any availability, return 0
-        if (slotOverlapScores.length === 0) {
-            return 0;
-        }
-
-        // Return the average overlap score across all slots with any availability
-        return slotOverlapScores.reduce((sum, score) => sum + score, 0) / slotOverlapScores.length;
+        // Return the average availability ratio
+        return totalSlots > 0 ? totalAvailable / totalSlots : 0;
     };
 
-    // Get color for date in mini calendar
+// Update the getDateColor function with stronger colors
     const getDateColor = (date: Date) => {
         const availability = getDateAvailabilitySummary(date);
 
+        // Debug log
+        console.log(`Date ${format(date, 'yyyy-MM-dd')} has availability: ${availability.toFixed(2)}`);
+
         if (availability === 0) return '';
-        if (availability < 0.25) return 'bg-red-100 dark:bg-red-900/30';
-        if (availability < 0.5) return 'bg-yellow-100 dark:bg-yellow-900/30';
-        if (availability < 0.75) return 'bg-green-100 dark:bg-green-900/30';
-        return 'bg-green-200 dark:bg-green-900/50';
+        if (availability < 0.25) return 'bg-red-200 dark:bg-red-900/40';
+        if (availability < 0.5) return 'bg-yellow-200 dark:bg-yellow-900/40';
+        if (availability < 0.75) return 'bg-green-200 dark:bg-green-900/40';
+        return 'bg-green-300 dark:bg-green-800/60';
     };
 
     // Check if a date has a scheduled session
@@ -902,6 +952,53 @@ export default function DateCalendar({
         }
     };
 
+    useEffect(() => {
+        const fetchAllCampaignSessions = async () => {
+            if (!campaignId) return;
+
+            try {
+                // Show loading state
+                setIsLoading(true);
+
+                // Fetch all sessions for this campaign without date filtering
+                const response = await fetch(`/api/scheduled-sessions?campaignId=${campaignId}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+
+                    if (data.sessions && data.sessions.length > 0) {
+                        // Update local state directly with the fetched sessions
+                        setLocalScheduledSessions(data.sessions);
+
+                        // Also update parent component if the callback exists
+                        if (fetchScheduledSessions) {
+                            await fetchScheduledSessions('all', 'all');
+                        }
+                    }
+                } else {
+                    console.error('Failed to fetch sessions:', data.error || 'Unknown error');
+                }
+            } catch (err) {
+                console.error('Error fetching campaign sessions:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchAllCampaignSessions();
+    }, [campaignId]);
+
+    useEffect(() => {
+        if (scheduledSessions && scheduledSessions.length > 0) {
+            console.log('Updating local sessions from props:', scheduledSessions.length);
+            setLocalScheduledSessions(scheduledSessions);
+        }
+    }, [scheduledSessions]);
 
     return (
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
@@ -917,6 +1014,86 @@ export default function DateCalendar({
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
                         </svg>
                     </button>
+
+                    {/* Date Picker Popup */}
+                    {showDatePicker && (
+                        <div
+                            ref={datePickerRef}
+                            className="fixed top-20 left-1/2 transform -translate-x-1/2 p-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg z-[1000] w-80"
+                            style={{
+                                position: 'fixed',
+                                zIndex: 1000,
+                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)'
+                            }}
+                        >
+                            <div className="flex justify-between items-center mb-4">
+                                <button
+                                    onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}
+                                    className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                         strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                        <path strokeLinecap="round" strokeLinejoin="round"
+                                              d="M15.75 19.5L8.25 12l7.5-7.5"/>
+                                    </svg>
+                                </button>
+
+                                <h3 className="font-medium text-gray-900 dark:text-white">
+                                    {format(selectedMonth, 'MMMM yyyy')}
+                                </h3>
+
+                                <button
+                                    onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}
+                                    className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                         strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                        <path strokeLinecap="round" strokeLinejoin="round"
+                                              d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-7 gap-1 text-center">
+                                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
+                                    <div key={index} className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        {day}
+                                    </div>
+                                ))}
+
+                                {generateCalendarMonth().map((date, index) => {
+                                    const isCurrentMonth = isSameMonth(date, selectedMonth);
+                                    const isSelected = daysInView.some(day => isSameDay(day, date));
+                                    const isCurrentDay = isToday(date);
+                                    const hasSession = hasScheduledSession(date);
+
+                                    // Get the color class - important to call it here
+                                    const dateColorClass = getDateColor(date);
+
+                                    return (
+                                        <button
+                                            key={index}
+                                            onClick={() => goToDate(date)}
+                                            disabled={isPastDate(date) || date > addWeeks(new Date(), maxWeeks)}
+                                            className={`p-1 rounded-full text-sm relative flex items-center justify-center
+                            ${isCurrentMonth ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}
+                            ${isSelected ? 'bg-indigo-100 dark:bg-indigo-900/30' : ''}
+                            ${isCurrentDay ? 'font-bold ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}
+                            ${isPastDate(date) || date > addWeeks(new Date(), maxWeeks) ?
+                                                'opacity-50 cursor-not-allowed' :
+                                                'hover:bg-gray-200 dark:hover:bg-gray-700'
+                                            }`}
+                                        >
+                                            {format(date, 'd')}
+                                            {hasSession && (
+                                                <span className="absolute top-0 right-0 h-2 w-2 bg-indigo-500 rounded-full"></span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="text-center">
                         <button
@@ -938,82 +1115,6 @@ export default function DateCalendar({
                             </button>
                         </div>
 
-                        {/* Date Picker Popup */}
-                        {showDatePicker && (
-                            <div
-                                ref={datePickerRef}
-                                className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 p-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg z-10 w-80"
-                            >
-                                <div className="flex justify-between items-center mb-4">
-                                    <button
-                                        onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}
-                                        className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                             strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                            <path strokeLinecap="round" strokeLinejoin="round"
-                                                  d="M15.75 19.5L8.25 12l7.5-7.5"/>
-                                        </svg>
-                                    </button>
-
-                                    <h3 className="font-medium text-gray-900 dark:text-white">
-                                        {format(selectedMonth, 'MMMM yyyy')}
-                                    </h3>
-
-                                    <button
-                                        onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}
-                                        className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                             strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                            <path strokeLinecap="round" strokeLinejoin="round"
-                                                  d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                                        </svg>
-                                    </button>
-                                </div>
-
-                                <div className="grid grid-cols-7 gap-1 text-center">
-                                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
-                                        <div key={index} className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            {day}
-                                        </div>
-                                    ))}
-
-                                    {generateCalendarMonth().map((date, index) => {
-                                        const isCurrentMonth = isSameMonth(date, selectedMonth);
-                                        const isSelected = daysInView.some(day => isSameDay(day, date));
-                                        const isCurrentDay = isToday(date);
-                                        const hasSession = hasScheduledSession(date);
-
-                                        // Force a calculation of the date color
-                                        const dateColorClass = getDateColor(date);
-
-                                        return (
-                                            <button
-                                                key={index}
-                                                onClick={() => goToDate(date)}
-                                                disabled={isPastDate(date) || date > addWeeks(new Date(), maxWeeks)}
-                                                className={`p-1 rounded-full text-sm relative flex items-center justify-center 
-                                                ${isCurrentMonth ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}
-                                                ${isSelected ? 'bg-indigo-100 dark:bg-indigo-900/30' : ''}
-                                                ${dateColorClass !== '' ? dateColorClass : ''}
-                                                ${isCurrentDay ? 'font-bold ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}
-                                                ${isPastDate(date) || date > addWeeks(new Date(), maxWeeks) ?
-                                                    'opacity-50 cursor-not-allowed' :
-                                                    'hover:bg-gray-200 dark:hover:bg-gray-700'
-                                                }`}
-                                            >
-                                                {format(date, 'd')}
-                                                {hasSession && (
-                                                    <span
-                                                        className="absolute top-0 right-0 h-2 w-2 bg-indigo-500 rounded-full"></span>
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     <button
@@ -1068,10 +1169,14 @@ export default function DateCalendar({
             </div>
 
             {/* Desktop View - Calendar Grid */}
-            {/* Desktop View - Calendar Grid */}
-            {/* Desktop View - Calendar Grid */}
             <div className="hidden md:block overflow-x-auto pb-2">
                 <div ref={calendarRef} className={zoomLevel === ZOOM_LEVELS.OUT ? "flex flex-col space-y-4" : "grid grid-cols-8 min-w-max"}>
+                    <CurrentTimeIndicator
+                        calendarRef={calendarRef}
+                        timeSlots={timeSlots}
+                        isVisible={daysInView.some(day => isToday(day))}
+                    />
+
                     {zoomLevel === ZOOM_LEVELS.OUT ? (
                         // 2-week view as stacked weeks
                         <>
@@ -1108,8 +1213,8 @@ export default function DateCalendar({
                                             const isAvailable = !!availability[key];
                                             const isPast = isPastDate(day) || (isToday(day) && new Date().getHours() >= hour);
                                             const {count, total} = countAvailableUsers(day, hour);
-                                            const availabilityColor = getAvailabilityColor(count, total);
                                             const session = getScheduledSession(day, hour);
+                                            const availabilityColor = getAvailabilityColor(count, total, !!session);
                                             const isSelected = selectedTimeSlot === key;
                                             const isHovered = hoveredDay && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
 
@@ -1173,8 +1278,8 @@ export default function DateCalendar({
                                             const isAvailable = !!availability[key];
                                             const isPast = isPastDate(day) || (isToday(day) && new Date().getHours() >= hour);
                                             const {count, total} = countAvailableUsers(day, hour);
-                                            const availabilityColor = getAvailabilityColor(count, total);
                                             const session = getScheduledSession(day, hour);
+                                            const availabilityColor = getAvailabilityColor(count, total, !!session);
                                             const isSelected = selectedTimeSlot === key;
                                             const isHovered = hoveredDay && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
 
@@ -1239,8 +1344,8 @@ export default function DateCalendar({
                                         const isAvailable = !!availability[key];
                                         const isPast = isPastDate(day) || (isToday(day) && new Date().getHours() >= hour);
                                         const {count, total} = countAvailableUsers(day, hour);
-                                        const availabilityColor = getAvailabilityColor(count, total);
                                         const session = getScheduledSession(day, hour);
+                                        const availabilityColor = getAvailabilityColor(count, total, !!session);
                                         const isSelected = selectedTimeSlot === key;
                                         const isHovered = hoveredDay && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
 
@@ -1274,7 +1379,6 @@ export default function DateCalendar({
                 </div>
             </div>
 
-            {/* Mobile View - Collapsible Days */}
             {/* Mobile View - Collapsible Days */}
             <div className="md:hidden">
                 {daysInView.map((day) => {
@@ -1365,40 +1469,25 @@ export default function DateCalendar({
                                                 dateStr={dateStr}
                                                 isAvailable={isAvailable}
                                                 isPast={isPast}
-                                                availabilityColor={getAvailabilityColor(count, total)}
+                                                availabilityColor={getAvailabilityColor(count, total, !!session)}
                                                 isSelected={isSelected}
                                                 count={count}
                                                 total={total}
                                                 session={session}
-                                                onCellClick={() => !isPast && handleTimeSlotClick(day, hour)}
+                                                // Directly call toggleAvailability to toggle cell state
+                                                onCellClick={() => !isPast && toggleAvailability(day, hour)}
+                                                // Remove the preventDefault to allow normal touch behavior
                                                 onTouchStart={(e) => {
                                                     if (!isPast) {
-                                                        e.preventDefault();
-                                                        handleDragStart(day, hour, e as unknown as React.MouseEvent);
+                                                        // Don't call preventDefault here
+                                                        // Don't use the drag system for mobile
                                                     }
                                                 }}
                                                 onTouchMove={(e) => {
-                                                    if (isDragging && !isPast) {
-                                                        e.preventDefault();
-                                                        const touch = e.touches[0];
-                                                        const element = document.elementFromPoint(touch.clientX, touch.clientY);
-                                                        if (element) {
-                                                            // Try to find the closest time slot element
-                                                            const timeSlotElement = element.closest('[data-time-slot]');
-                                                            if (timeSlotElement) {
-                                                                const key = timeSlotElement.getAttribute('data-time-slot');
-                                                                if (key) {
-                                                                    const [dateStr, hourStr] = key.split('-');
-                                                                    const date = parseISO(dateStr);
-                                                                    const hour = parseFloat(hourStr);
-                                                                    handleDragOver(date, hour);
-                                                                }
-                                                            }
-                                                        }
-                                                    }
+                                                    // Keep empty to prevent drag behavior on mobile
                                                 }}
-                                                availableUsers={getUsersAvailability(day, hour).availableUsers}
-                                                unavailableUsers={getUsersAvailability(day, hour).unavailableUsers}
+                                                availableUsers={availableUsers}
+                                                unavailableUsers={unavailableUsers}
                                                 displayTime={(h) => formatTime(h, timeFormat)}
                                             />
                                         );
@@ -1409,6 +1498,7 @@ export default function DateCalendar({
                     );
                 })}
             </div>
+
 
             <div className="mt-8">
                 <SessionList

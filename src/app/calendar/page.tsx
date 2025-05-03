@@ -141,6 +141,14 @@ export default function Calendar() {
                 setUsername(userData.username);
                 setIsAdmin(userData.isAdmin);
 
+                const profileResponse = await fetch('/api/profile');
+                const profileData = await profileResponse.json();
+
+                if (profileData.success && profileData.profile) {
+                    // Set time format based on profile preference
+                    setTimeFormat(profileData.profile.use24HourFormat ? '24h' : '12h');
+                }
+
                 // Fetch available campaigns
                 const campaignsResponse = await fetch('/api/campaigns');
                 const campaignsData = await campaignsResponse.json();
@@ -307,18 +315,24 @@ export default function Calendar() {
     };
 
 
-    // Fetch scheduled sessions for the current week
+    // Modify fetchScheduledSessions in calendar/page.tsx to handle 'all' parameter
+
+// Update the fetchScheduledSessions function
     const fetchScheduledSessions = async (startDate: string, endDate: string) => {
         try {
             if (!currentCampaignId) return;
 
             console.log(`Fetching scheduled sessions for campaign: ${currentCampaignId}`);
 
-            const response = await fetch(`/api/scheduled-sessions?campaignId=${currentCampaignId}&start=${startDate}&end=${endDate}`);
+            let url = `/api/scheduled-sessions?campaignId=${currentCampaignId}`;
+
+
+            const response = await fetch(url);
             const data = await response.json();
 
             if (data.success) {
                 setScheduledSessions(data.sessions || []);
+                console.log(`Loaded ${data.sessions?.length || 0} sessions`);
             } else {
                 console.error("Error fetching sessions:", data.error);
             }
@@ -505,13 +519,6 @@ export default function Calendar() {
                         isAdmin={isAdmin}
                     />
                 </div>
-                <button
-                    onClick={toggleTimeFormat}
-                    className="mt-2 sm:mt-0 px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-md text-gray-800 dark:text-white text-sm hover:bg-gray-300 dark:hover:bg-gray-600"
-                >
-                    {timeFormat === '12h' ? '12h' : '24h'}
-                    <span className="ml-1 text-xs">↺</span>
-                </button>
             </div>
 
             {announcement.text && (

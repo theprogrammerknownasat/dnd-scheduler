@@ -116,13 +116,13 @@ export default function AdminDashboard() {
                     setUsers(usersData.users);
                 }
 
-                // Fetch active users
+                /*// Fetch active users
                 const activeUsersResponse = await fetch('/api/admin/active-users');
                 const activeUsersData = await activeUsersResponse.json();
 
                 if (activeUsersData.success) {
                     setActiveUsers(activeUsersData.activeUsers);
-                }
+                }*/
 
                 // Fetch settings
                 const settingsResponse = await fetch('/api/settings');
@@ -167,6 +167,40 @@ export default function AdminDashboard() {
 
         return () => clearInterval(interval);
     }, [router]);
+
+    // Update in admin/page.tsx - add/modify the useEffect for active users
+
+// Add this useEffect specifically for active users polling
+    // Add this to admin/page.tsx
+
+// Add a dedicated effect for active users polling
+    useEffect(() => {
+        const fetchActiveUsers = async () => {
+            try {
+                console.log("Fetching active users...");
+                const response = await fetch('/api/admin/active-users');
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    console.log("Active users data received:", data.activeUsers);
+                    setActiveUsers(data.activeUsers || []);
+                } else {
+                    console.error("Failed to fetch active users:", data.error || "Unknown error");
+                }
+            } catch (err) {
+                console.error('Error fetching active users:', err);
+            }
+        };
+
+        // Fetch active users immediately on mount
+        fetchActiveUsers();
+
+        // Set up polling interval - fetch every 5 seconds
+        const interval = setInterval(fetchActiveUsers, 5000);
+
+        // Clean up on unmount
+        return () => clearInterval(interval);
+    }, []); // Empty dependency array = only run on mount and unmount
 
     // Fetch campaign-specific data when selected campaign changes
     useEffect(() => {

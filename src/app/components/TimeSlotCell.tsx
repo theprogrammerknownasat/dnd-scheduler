@@ -1,5 +1,6 @@
-// src/app/components/TimeSlotCell.tsx
-"use client";
+// Update TimeSlotCell.tsx to make sessions more visible
+
+// 1. Update the component for better session visibility
 import React, { useState, useEffect, useRef } from 'react';
 import { isToday, format, isSameDay } from 'date-fns';
 
@@ -45,18 +46,27 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
     const [showTooltip, setShowTooltip] = useState(false);
     const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
     const key = `${dateStr}-${hour}`;
+    const cellRef = useRef<HTMLDivElement>(null);
+    const isFullAvailability = count === total && count > 0;
 
-    // Tooltip functions
+    // Log session info for debugging
+    useEffect(() => {
+        if (session) {
+            console.log(`TimeSlotCell rendering with session: ${session.title} at ${dateStr}-${hour}`);
+        }
+    }, [session, dateStr, hour]);
+
+    // Tooltip functions with delays adjusted for better usability
     const handleMouseEnterWithTooltip = () => {
         if (isPast) return;
 
         // Call the parent component's onMouseEnter
         onMouseEnter(day, hour);
 
-        // Set timer for tooltip
+        // Set timer for tooltip - shorter delay for better responsiveness
         const timer = setTimeout(() => {
             setShowTooltip(true);
-        }, 1000); // 1 second delay
+        }, 500); // Reduced from 1000ms to 500ms for better responsiveness
 
         setLongPressTimer(timer);
     };
@@ -78,11 +88,11 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
     const handleTouchStart = (e: React.TouchEvent) => {
         if (isPast) return;
 
-        // Set timer for long press
+        // Set timer for long press with shorter delay
         const timer = setTimeout(() => {
             e.preventDefault(); // Prevent default to avoid toggling availability
             setShowTooltip(true);
-        }, 400); // Reduced from 700ms to 400ms
+        }, 400); // Responsive touch delay
 
         setLongPressTimer(timer);
     };
@@ -104,17 +114,24 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
     }, [longPressTimer]);
 
     // Get available/unavailable users for tooltip
-    const { availableUsers, unavailableUsers } = getAvailableUsers(day, hour);
+    const {availableUsers, unavailableUsers} = getAvailableUsers(day, hour);
+
+    // Strongly highlight sessions with distinct visual cues
+    const sessionHighlight = session ?
+        'border-l-4 border-blue-500 bg-blue-100 dark:bg-blue-900/40' : '';
 
     return (
         <div
+            ref={cellRef}
             data-time-slot={key}
+            data-has-session={session ? 'true' : 'false'} // Add data attribute to help debugging
+            data-full-availability={isFullAvailability ? 'true' : 'false'}
             className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center relative
                 ${!isPast ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}
-                ${isAvailable ? 'bg-green-50 dark:bg-green-900/20' : ''}
                 ${isToday(day) ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}
-                ${session ? 'bg-indigo-100 dark:bg-indigo-900/30 border-l-4 border-indigo-500' : ''}
                 ${availabilityColor}
+                ${sessionHighlight}
+                ${isFullAvailability ? '!bg-green-700 dark:!bg-green-800' : ''}
                 ${isSelected ? 'ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}
                 ${isHovered ? 'ring-2 ring-gray-400 dark:ring-gray-500' : ''}
             `}
@@ -125,18 +142,29 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
         >
-            <div className="flex flex-col items-center">
+            {/* Session indicator overlay */}
+            {session && (
+                <div className="absolute inset-0 bg-blue-200/40 dark:bg-blue-700/30 z-0 pointer-events-none"></div>
+            )}
+
+            <div className="flex flex-col items-center relative z-10">
                 {isAvailable ?
                     <span className="h-6 w-6 rounded-full bg-green-500 text-white flex items-center justify-center">✓</span>
                     :
                     <span className="h-6 w-6 rounded-full bg-gray-200 dark:bg-gray-600"></span>
                 }
                 <span className="text-xs text-gray-700 dark:text-gray-300 mt-1">
-                    {count}/{total} {session && `• ${session.title}`}
+                    {count}/{total}
                 </span>
+                {/* Make session title more visible */}
+                {session && (
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1 truncate max-w-full">
+                        {session.title}
+                    </span>
+                )}
             </div>
 
-            {/* Availability tooltip */}
+            {/* Enhanced session tooltip */}
             {showTooltip && (
                 <div
                     className="absolute z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 w-64 transition-opacity"
@@ -159,6 +187,21 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
                         {format(day, 'EEE, MMM d')} at {displayTime(hour)}
                     </div>
 
+                    {/* Display session info if there's a session */}
+                    {session && (
+                        <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500 rounded">
+                            <div className="font-medium text-blue-700 dark:text-blue-300">
+                                Scheduled Session: {session.title}
+                            </div>
+                            <div className="text-xs text-blue-600 dark:text-blue-400">
+                                {displayTime(session.startTime)} - {displayTime(session.endTime)}
+                            </div>
+                            {session.notes && (
+                                <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">{session.notes}</div>
+                            )}
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
                             <h4 className="font-medium text-green-600 dark:text-green-400">Available ({count})</h4>
@@ -177,7 +220,8 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
                         </div>
 
                         <div>
-                            <h4 className="font-medium text-red-600 dark:text-red-400">Unavailable ({total - count})</h4>
+                            <h4 className="font-medium text-red-600 dark:text-red-400">Unavailable
+                                ({total - count})</h4>
                             {total - count > 0 ? (
                                 <ul className="text-gray-600 dark:text-gray-400 space-y-1 mt-1">
                                     {unavailableUsers.map(name => (
