@@ -47,6 +47,12 @@ const MobileCellWithTooltip: React.FC<MobileCellWithTooltipProps> = ({
     const isTooltipShowingRef = useRef<boolean>(false);
     const cellRef = useRef<HTMLDivElement>(null);
 
+    // Utility function to truncate text
+    const truncateText = (text: string, maxLength: number): string => {
+        if (text.length <= maxLength) return text;
+        return text.slice(0, maxLength - 3) + '...';
+    };
+
     const handleTouchStartWithTooltip = (e: React.TouchEvent) => {
         if (isPast) return;
 
@@ -97,18 +103,18 @@ const MobileCellWithTooltip: React.FC<MobileCellWithTooltipProps> = ({
         </button>
     `;
 
-        // Add session info if available - with blue styling
+        // Add session info if available - with blue styling and text truncation
         if (session) {
             const sessionInfo = document.createElement('div');
             sessionInfo.className = 'p-3 mb-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded';
             sessionInfo.innerHTML = `
             <div class="font-medium text-blue-700 dark:text-blue-300">
-                Scheduled Session: ${session.title}
+                Scheduled Session: ${truncateText(session.title, 20)}
             </div>
             <div class="text-sm text-blue-600 dark:text-blue-400">
                 ${displayTime(session.startTime)} - ${displayTime(session.endTime)}
             </div>
-            ${session.notes ? `<div class="mt-1 text-gray-700 dark:text-gray-300">${session.notes}</div>` : ''}
+            ${session.notes ? `<div class="mt-1 text-gray-700 dark:text-gray-300">${truncateText(session.notes, 50)}</div>` : ''}
         `;
             modal.appendChild(sessionInfo);
         }
@@ -205,7 +211,7 @@ const MobileCellWithTooltip: React.FC<MobileCellWithTooltipProps> = ({
                 <span className="text-gray-700 dark:text-gray-300">{displayTime(hour)}</span>
                 {session && (
                     <span className="ml-2 text-sm text-blue-600 dark:text-blue-400 font-medium">
-                        {session.title}
+                        {truncateText(session.title, 20)}
                     </span>
                 )}
             </div>

@@ -16,90 +16,89 @@ const CurrentTimeIndicator: React.FC<CurrentTimeIndicatorProps> = ({
     const [isVisible, setIsVisible] = useState(false);
 
     // Calculate position based on current time
-    const updatePosition = () => {
-        if (!calendarRef.current) {
-            return;
-        }
-
-        const now = new Date();
-        const hours = now.getHours();
-        const minutes = now.getMinutes();
-
-        // Format time for display
-        if (timeFormat === '12h') {
-            setCurrentTime(format(now, 'h:mm a'));
-        } else {
-            setCurrentTime(format(now, 'HH:mm'));
-        }
-
-        // Calculate decimal hour (e.g., 14.5 for 2:30 PM)
-        const currentDecimalHour = hours + (minutes / 60);
-
-        // Only show indicator between 8 AM and 10 PM
-        if (currentDecimalHour < 8 || currentDecimalHour >= 22) {
-            setIsVisible(false);
-            return;
-        }
-
-        setIsVisible(true);
-
-        // Get time slot cells for today
-        const todayStr = format(now, 'yyyy-MM-dd');
-        const timeSlotCells = Array.from(
-            calendarRef.current.querySelectorAll(`[data-time-slot*="${todayStr}"]`)
-        );
-
-        if (timeSlotCells.length === 0) {
-            setIsVisible(false);
-            return;
-        }
-
-        // Calculate position between time slots
-        const slotIndex = Math.floor(currentDecimalHour - 8);
-        const progressInHour = (currentDecimalHour - Math.floor(currentDecimalHour));
-
-        // Get current and next time slot cells
-        const currentCell = timeSlotCells[slotIndex] as HTMLElement;
-        const nextCell = timeSlotCells[slotIndex + 1] as HTMLElement;
-
-        if (!currentCell) {
-            setIsVisible(false);
-            return;
-        }
-
-        // Get positions
-        const calendarRect = calendarRef.current.getBoundingClientRect();
-        const currentCellRect = currentCell.getBoundingClientRect();
-        const cellHeight = currentCellRect.height;
-        const cellTop = currentCellRect.top - calendarRect.top;
-
-        // Calculate exact position
-        let topPosition = cellTop;
-        if (nextCell) {
-            topPosition += progressInHour * cellHeight;
-        }
-
-        // Find the left edge (skip the time labels column)
-        let leftPosition = currentCellRect.width;
-        const calendar = calendarRef.current;
-        if (calendar) {
-            // Find the first data cell (not a time label)
-            const firstDataCell = calendar.querySelector('[data-time-slot]:not([data-time-slot$=""])');
-            if (firstDataCell) {
-                const firstCellRect = firstDataCell.getBoundingClientRect();
-                leftPosition = firstCellRect.left - calendarRect.left;
-            }
-        }
-
-        setPosition({
-            top: topPosition,
-            left: leftPosition,
-            width: calendarRect.width - leftPosition
-        });
-    };
-
-    // Update on mount and every minute
     useEffect(() => {
+        const updatePosition = () => {
+            if (!calendarRef.current) {
+                return;
+            }
+
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+
+            // Format time for display
+            if (timeFormat === '12h') {
+                setCurrentTime(format(now, 'h:mm a'));
+            } else {
+                setCurrentTime(format(now, 'HH:mm'));
+            }
+
+            // Calculate decimal hour (e.g., 14.5 for 2:30 PM)
+            const currentDecimalHour = hours + (minutes / 60);
+
+            // Only show indicator between 8 AM and 10 PM
+            if (currentDecimalHour < 8 || currentDecimalHour >= 22) {
+                setIsVisible(false);
+                return;
+            }
+
+            setIsVisible(true);
+
+            // Get time slot cells for today
+            const todayStr = format(now, 'yyyy-MM-dd');
+            const timeSlotCells = Array.from(
+                calendarRef.current.querySelectorAll(`[data-time-slot*="${todayStr}"]`)
+            );
+
+            if (timeSlotCells.length === 0) {
+                setIsVisible(false);
+                return;
+            }
+
+            // Calculate position between time slots
+            const slotIndex = Math.floor(currentDecimalHour - 8);
+            const progressInHour = (currentDecimalHour - Math.floor(currentDecimalHour));
+
+            // Get current and next time slot cells
+            const currentCell = timeSlotCells[slotIndex] as HTMLElement;
+            const nextCell = timeSlotCells[slotIndex + 1] as HTMLElement;
+
+            if (!currentCell) {
+                setIsVisible(false);
+                return;
+            }
+
+            // Get positions
+            const calendarRect = calendarRef.current.getBoundingClientRect();
+            const currentCellRect = currentCell.getBoundingClientRect();
+            const cellHeight = currentCellRect.height;
+            const cellTop = currentCellRect.top - calendarRect.top;
+
+            // Calculate exact position
+            let topPosition = cellTop;
+            if (nextCell) {
+                topPosition += progressInHour * cellHeight;
+            }
+
+            // Find the left edge (skip the time labels column)
+            let leftPosition = currentCellRect.width;
+            const calendar = calendarRef.current;
+            if (calendar) {
+                // Find the first data cell (not a time label)
+                const firstDataCell = calendar.querySelector('[data-time-slot]:not([data-time-slot$=""])');
+                if (firstDataCell) {
+                    const firstCellRect = firstDataCell.getBoundingClientRect();
+                    leftPosition = firstCellRect.left - calendarRect.left;
+                }
+            }
+
+            setPosition({
+                top: topPosition,
+                left: leftPosition,
+                width: calendarRect.width - leftPosition
+            });
+        };
+
         updatePosition();
 
         const interval = setInterval(() => {
@@ -107,7 +106,8 @@ const CurrentTimeIndicator: React.FC<CurrentTimeIndicatorProps> = ({
         }, 60000); // Update every minute
 
         return () => clearInterval(interval);
-    }, [calendarRef.current, timeFormat]);
+    }, [calendarRef, timeFormat]);
+
 
     if (!isVisible) return null;
 

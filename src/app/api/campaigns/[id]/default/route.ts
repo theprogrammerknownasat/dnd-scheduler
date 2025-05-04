@@ -6,10 +6,10 @@ import Campaign from '@/models/Campaign';
 // Set a campaign as default (admin only)
 export async function POST(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = params.id;
+        const { id } = await params;
         const cookieStore = await cookies();
         const username = cookieStore.get('user')?.value;
         const isAdmin = cookieStore.get('isAdmin')?.value === 'true';

@@ -1,6 +1,6 @@
 // src/app/calendar/page.tsx
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import { useRouter } from 'next/navigation';
 import {addWeeks, format} from 'date-fns';
 import Header from '../components/Header';
@@ -8,7 +8,7 @@ import DateCalendar from '../components/DateCalendar';
 import PollComponent from '../components/PollComponent';
 import CampaignSelector from '../components/CampaignSelector';
 import ScheduledSessionForm from '../components/ScheduledSessionForm';
-import { formatTimestamp, getUserTimeFormat, setUserTimeFormat } from '@/utils/dateTimeFormatter';
+import { formatTimestamp, getUserTimeFormat } from '@/utils/dateTimeFormatter';
 
 interface User {
     _id: string;
@@ -30,24 +30,6 @@ interface Announcement {
     text: string;
     color: string;
     createdAt?: string;
-}
-
-function debounce<T extends (...args: any[]) => any>(
-    func: T,
-    wait: number
-): (...args: Parameters<T>) => void {
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-
-    return function executedFunction(...args: Parameters<T>) {
-        if (timeout) {
-            clearTimeout(timeout);
-        }
-
-        timeout = setTimeout(() => {
-            func(...args);
-            timeout = null;
-        }, wait);
-    };
 }
 
 export default function Calendar() {
@@ -192,6 +174,44 @@ export default function Calendar() {
         fetchUserAndCampaigns();
     }, [router]);
 
+    // Fetch all users' availability for the current week
+    const fetchAllUsersAvailability = useCallback( async (startDate: string, endDate: string) => {
+        try {
+            if (!currentCampaignId) return;
+
+            const response = await fetch(`/api/calendar/all-availability?campaignId=${currentCampaignId}&start=${startDate}&end=${endDate}`);
+            const data = await response.json();
+
+            if (data.success) {
+                setAllUsersAvailability(data.availability || {});
+            } else {
+                console.error("Error fetching availability:", data.error);
+            }
+        } catch (err) {
+            console.error('Error fetching all users availability:', err);
+        }
+    }, [currentCampaignId]);
+
+    const fetchScheduledSessions = useCallback( async () => {
+        try {
+            if (!currentCampaignId) return;
+
+            const url = `/api/scheduled-sessions?campaignId=${currentCampaignId}`;
+
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.success) {
+                setScheduledSessions(data.sessions || []);
+            } else {
+                console.error("Error fetching sessions:", data.error);
+            }
+        } catch (err) {
+            console.error('Error fetching scheduled sessions:', err);
+        }
+    }, [currentCampaignId]);
+
     // Fetch campaign-specific data when campaign changes
     useEffect(() => {
         if (!currentCampaignId) return;
@@ -229,7 +249,7 @@ export default function Calendar() {
 
                     // Fetch initial data for the current week
                     await fetchAllUsersAvailability(startDate, endDate);
-                    await fetchScheduledSessions(startDate, endDate);
+                    await fetchScheduledSessions();
                 }
 
                 // Save this campaign as the last selected
@@ -242,55 +262,7 @@ export default function Calendar() {
         };
 
         fetchCampaignData();
-    }, [currentCampaignId]);
-
-    // Fetch all users' availability for the current week
-    const fetchAllUsersAvailability = async (startDate: string, endDate: string) => {
-        try {
-            if (!currentCampaignId) return;
-
-            console.log(`Fetching availability for campaign: ${currentCampaignId}`);
-
-            const response = await fetch(`/api/calendar/all-availability?campaignId=${currentCampaignId}&start=${startDate}&end=${endDate}`);
-            const data = await response.json();
-
-            if (data.success) {
-                setAllUsersAvailability(data.availability || {});
-            } else {
-                console.error("Error fetching availability:", data.error);
-            }
-        } catch (err) {
-            console.error('Error fetching all users availability:', err);
-        }
-    };
-
-
-    // Modify fetchScheduledSessions in calendar/page.tsx to handle 'all' parameter
-
-// Update the fetchScheduledSessions function
-    const fetchScheduledSessions = async (startDate: string, endDate: string) => {
-        try {
-            if (!currentCampaignId) return;
-
-            console.log(`Fetching scheduled sessions for campaign: ${currentCampaignId}`);
-
-            const url = `/api/scheduled-sessions?campaignId=${currentCampaignId}`;
-
-
-            const response = await fetch(url);
-            const data = await response.json();
-
-            if (data.success) {
-                setScheduledSessions(data.sessions || []);
-                console.log(`Loaded ${data.sessions?.length || 0} sessions`);
-            } else {
-                console.error("Error fetching sessions:", data.error);
-            }
-        } catch (err) {
-            console.error('Error fetching scheduled sessions:', err);
-        }
-    };
-
+    }, [currentCampaignId, fetchAllUsersAvailability, fetchScheduledSessions]);
 
     // Handle updating availability
     const handleAvailabilityChange = async (date: Date, hour: number, isAvailable: boolean) => {
@@ -308,9 +280,6 @@ export default function Calendar() {
 
         // If there's no campaignId, don't try to save to the server
         if (!currentCampaignId) return;
-
-        // Log for debugging
-        console.log(`Updating availability for ${username} on ${dateStr} at ${hour}:00 to ${isAvailable ? 'available' : 'unavailable'} in campaign ${currentCampaignId}`);
 
         // Optionally send the update to the server directly if needed
         try {
@@ -333,8 +302,6 @@ export default function Calendar() {
     const handleCampaignChange = (campaignId: string) => {
         if (campaignId === currentCampaignId) return; // Don't do anything if the ID hasn't changed
 
-        console.log(`Switching to campaign: ${campaignId}`);
-
         // Reset ALL campaign-specific state
         setAllUsersAvailability({});
         setScheduledSessions([]);
@@ -346,9 +313,9 @@ export default function Calendar() {
         // Save to localStorage
         localStorage.setItem('lastCampaignId', campaignId);
     };
+
     // Handle scheduling a session
     const handleSessionCreated = async () => {
-        console.log("Session created!");
 
         // Close the form first
         setShowScheduleForm(false);
@@ -356,29 +323,21 @@ export default function Calendar() {
         // Refresh scheduled sessions
         if (scheduleDate) {
             // Use a wider date range to capture potential multi-day sessions
-            const startDate = format(scheduleDate, 'yyyy-MM-dd');
-            const endDate = format(addWeeks(scheduleDate, 1), 'yyyy-MM-dd');
-
-            console.log("Refreshing sessions for date range:", startDate, "to", endDate);
-
+            format(scheduleDate, 'yyyy-MM-dd');
+            format(addWeeks(scheduleDate, 1), 'yyyy-MM-dd');
             // Fetch the updated sessions
-            await fetchScheduledSessions(startDate, endDate);
+            await fetchScheduledSessions();
         }
     };
 
-// 5. Add a debugging message when scheduling a session
+    // 5. Add a debugging message when scheduling a session
     const handleScheduleSession = (date: Date) => {
-        console.log("Schedule session called with date:", format(date, 'yyyy-MM-dd'));
 
         // Save the date for the form
         setScheduleDate(date);
 
         // Show the form
         setShowScheduleForm(true);
-
-        // Log current state for debugging
-        console.log("Current campaign ID:", currentCampaignId);
-        console.log("Show schedule form set to:", true);
     };
 
     useEffect(() => {
@@ -391,10 +350,10 @@ export default function Calendar() {
 
         // Fetch data for the current date range
         fetchAllUsersAvailability(startDate, endDate);
-        fetchScheduledSessions(startDate, endDate);
+        fetchScheduledSessions();
 
         // This effect should run whenever the campaign changes or the data version changes
-    }, [currentCampaignId, campaignDataVersion]);
+    }, [currentCampaignId, fetchAllUsersAvailability, fetchScheduledSessions]);
 
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -403,16 +362,21 @@ export default function Calendar() {
                 const profileData = await profileResponse.json();
 
                 if (profileData.success && profileData.profile) {
-                    // Update preferences if they exist
-                    const updatedPreferences = { ...userPreferences };
-                    if (profileData.profile.maxPreviousSessions !== undefined) {
-                        updatedPreferences.maxPreviousSessions = profileData.profile.maxPreviousSessions;
-                    }
-                    if (profileData.profile.maxFutureSessions !== undefined) {
-                        updatedPreferences.maxFutureSessions = profileData.profile.maxFutureSessions;
-                    }
+                    // Create a new preferences object only if there are actual changes
+                    const updatedPreferences = {
+                        maxPreviousSessions: profileData.profile.maxPreviousSessions !== undefined
+                            ? profileData.profile.maxPreviousSessions
+                            : userPreferences.maxPreviousSessions,
+                        maxFutureSessions: profileData.profile.maxFutureSessions !== undefined
+                            ? profileData.profile.maxFutureSessions
+                            : userPreferences.maxFutureSessions
+                    };
 
-                    setUserPreferences(updatedPreferences);
+                    // Only update if the values actually changed
+                    if (updatedPreferences.maxPreviousSessions !== userPreferences.maxPreviousSessions ||
+                        updatedPreferences.maxFutureSessions !== userPreferences.maxFutureSessions) {
+                        setUserPreferences(updatedPreferences);
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching user profile:', error);
@@ -420,8 +384,10 @@ export default function Calendar() {
         };
 
         fetchUserProfile();
-    }, []);
+    }, [userPreferences.maxPreviousSessions, userPreferences.maxFutureSessions]);
+
     React.useMemo(() => currentCampaignId, [currentCampaignId]);
+
     const getAnnouncementClasses = () => {
         const baseClasses = "border-l-4 p-4 mb-4 rounded";
 
@@ -515,11 +481,9 @@ export default function Calendar() {
                         campaignId={currentCampaignId}
                         date={scheduleDate}
                         onClose={() => {
-                            console.log("Closing session form");
                             setShowScheduleForm(false);
                         }}
                         onSessionCreated={() => {
-                            console.log("Session created callback fired");
                             handleSessionCreated();
                         }}
                         timeFormat={timeFormat}

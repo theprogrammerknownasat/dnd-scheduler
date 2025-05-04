@@ -24,7 +24,6 @@ export async function GET() {
             // Create admin user
             await User.create({
                 username: 'admin',
-                displayName: 'Admin',
                 password: null, // Will need to set a password on first login
                 isAdmin: true,
                 campaigns: [],

@@ -52,6 +52,7 @@ interface ScheduledSession {
     startTime: number;
     endTime: number;
     notes: string;
+    campaignId: string;
 }
 
 interface DateCalendarProps {
@@ -83,9 +84,6 @@ export default function DateCalendar({
                                          fetchAllUsersAvailability,
                                          fetchScheduledSessions,
                                          timeFormat = '12h',
-                                         maxPreviousSessions = 3,
-                                         maxFutureSessions = 5,
-
                                      }: DateCalendarProps) {
     // Calendar state
     const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
@@ -113,10 +111,10 @@ export default function DateCalendar({
 
     // Refs
     const datePickerRef = useRef<HTMLDivElement>(null);
-    const calendarRef = useRef<HTMLDivElement>(null);
+    const calendarRef = useRef<HTMLDivElement>(null!);
     useRef<Date[]>([]);
-    const timeDisplayCache = useMemo(() => new Map<number, string>(), [timeFormat]);
-    useMemo(() => new Map<string, unknown>(), [scheduledSessions]);
+    const timeDisplayCache = useMemo(() => new Map<number, string>(), []);
+    useMemo(() => new Map<string, unknown>(), []);
 // Get time slots based on current zoom level
     const timeSlots = zoomLevel === ZOOM_LEVELS.IN
         ? HALF_HOUR_SLOTS
@@ -229,12 +227,10 @@ export default function DateCalendar({
                 // For 2-week view, make sure to get the full range of days
                 startDate = format(startOfWeek(currentWeekStart, {weekStartsOn: 1}), 'yyyy-MM-dd');
                 endDate = format(endOfWeek(addWeeks(currentWeekStart, 1), {weekStartsOn: 1}), 'yyyy-MM-dd');
-                console.log(`Fetching data for 2-week view: ${startDate} to ${endDate}`);
             } else {
                 // For other views, use the current daysInView
                 startDate = format(daysInView[0], 'yyyy-MM-dd');
                 endDate = format(daysInView[daysInView.length - 1], 'yyyy-MM-dd');
-                console.log(`Fetching data for regular view: ${startDate} to ${endDate}`);
             }
 
             // Store the current date range to prevent re-fetching
@@ -522,14 +518,29 @@ export default function DateCalendar({
         return date < today;
     };
 
-    const parseSessionDate = (dateValue: never): string => {
-        // If it's already a proper YYYY-MM-DD string, return it
+    const parseSessionDate = (dateValue: string | Date | unknown): string => {
+        // If it's already a string in YYYY-MM-DD format, return it
         if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
             return dateValue;
         }
 
+        // If it's already a proper YYYY-MM-DD string, return it
+        if (typeof dateValue === 'string') {
+            // Try to parse it as a date
+            const date = new Date(dateValue);
+
+            // If it's invalid, return empty string
+            if (isNaN(date.getTime())) {
+                console.error('Invalid date value:', dateValue);
+                return '';
+            }
+
+            // Return formatted date
+            return format(date, 'yyyy-MM-dd');
+        }
+
         // If it's a Date object or any other date format, parse it
-        const date = new Date(dateValue);
+        const date = new Date(dateValue as string | Date);
 
         // If it's invalid, return empty string
         if (isNaN(date.getTime())) {
@@ -543,6 +554,7 @@ export default function DateCalendar({
 
 // In DateCalendar.tsx, update the getScheduledSession function:
 
+// Replace your getScheduledSession function with this fixed version:
     const getScheduledSession = (date: Date, hour: number) => {
         // If no sessions, return null immediately
         if (!scheduledSessions || scheduledSessions.length === 0) {
@@ -552,26 +564,21 @@ export default function DateCalendar({
         // Format the date string for matching with session.date
         const dateStr = format(date, 'yyyy-MM-dd');
 
-        // Ensure hour is a number for comparison
-        const hourNum = typeof hour === 'number' ? hour : parseFloat(hour.toString());
-
         // Find the session that matches this date and time slot
         return scheduledSessions.find(session => {
             // Parse the session date using our universal handler
-            const sessionDate = parseSessionDate(session.date);
+            const sessionDate = parseSessionDate(session.date as string | Date);
 
             // Check if the date matches (both should be YYYY-MM-DD now)
             const dateMatches = sessionDate === dateStr;
 
-            // Convert startTime and endTime to numbers if they're strings
-            const startTime = typeof session.startTime === 'number' ?
-                session.startTime : parseFloat(session.startTime.toString());
-
-            const endTime = typeof session.endTime === 'number' ?
-                session.endTime : parseFloat(session.endTime.toString());
+            // Convert startTime and endTime to numbers
+            // Since ScheduledSession interface has startTime: number, we don't need conversion
+            const startTime = Number(session.startTime);
+            const endTime = Number(session.endTime);
 
             // Check if this hour is within the session's time range
-            const timeInRange = hourNum >= startTime && hourNum < endTime;
+            const timeInRange = hour >= startTime && hour < endTime;
 
             // Both date and time must match
             return dateMatches && timeInRange;
@@ -682,9 +689,6 @@ export default function DateCalendar({
     const getDateColor = (date: Date) => {
         const availability = getDateAvailabilitySummary(date);
 
-        // Debug log
-        console.log(`Date ${format(date, 'yyyy-MM-dd')} has availability: ${availability.toFixed(2)}`);
-
         if (availability === 0) return '';
         if (availability < 0.25) return 'bg-red-200 dark:bg-red-900/40';
         if (availability < 0.5) return 'bg-yellow-200 dark:bg-yellow-900/40';
@@ -746,8 +750,10 @@ export default function DateCalendar({
 
         timeDisplayCache.set(hour, result);
         return result;
-    }, [timeFormat]);
+    }, [timeFormat, timeDisplayCache]);
+
     daysInView.map(day => format(day, 'yyyy-MM-dd'));
+
     useEffect(() => {
         const fetchAllCampaignSessions = async () => {
             if (!campaignId) return;
@@ -787,11 +793,10 @@ export default function DateCalendar({
         };
 
         fetchAllCampaignSessions();
-    }, [campaignId]);
+    }, [campaignId, fetchScheduledSessions]);
 
     useEffect(() => {
         if (scheduledSessions && scheduledSessions.length > 0) {
-            console.log('Updating local sessions from props:', scheduledSessions.length);
             setLocalScheduledSessions(scheduledSessions);
         }
     }, [scheduledSessions]);
@@ -990,7 +995,7 @@ export default function DateCalendar({
                                         <div
                                             key={format(day, 'yyyy-MM-dd')}
                                             className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center font-medium 
-                                                ${isToday(day) ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}
+                                                ${isToday(day) ? '' : 'bg-gray-50 dark:bg-gray-700'}`}
                                         >
                                             <div className="text-gray-500 dark:text-gray-300">{format(day, 'EEE')}</div>
                                             <div
@@ -1017,7 +1022,7 @@ export default function DateCalendar({
                                                 const session = getScheduledSession(day, hour);
                                                 const availabilityColor = getAvailabilityColor(count, total, !!session);
                                                 const isSelected = selectedTimeSlot === key;
-                                                const isHovered = hoveredDay && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
+                                                const isHovered = hoveredDay !== null && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
 
                                                 return (
                                                     <TimeSlotCell
@@ -1055,7 +1060,7 @@ export default function DateCalendar({
                                         <div
                                             key={format(day, 'yyyy-MM-dd')}
                                             className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center font-medium 
-                                                ${isToday(day) ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}
+                                                ${isToday(day) ? '' : 'bg-gray-50 dark:bg-gray-700'}`}
                                         >
                                             <div className="text-gray-500 dark:text-gray-300">{format(day, 'EEE')}</div>
                                             <div
@@ -1082,7 +1087,7 @@ export default function DateCalendar({
                                                 const session = getScheduledSession(day, hour);
                                                 const availabilityColor = getAvailabilityColor(count, total, !!session);
                                                 const isSelected = selectedTimeSlot === key;
-                                                const isHovered = hoveredDay && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
+                                                const isHovered = hoveredDay !== null && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
 
                                                 return (
                                                     <TimeSlotCell
@@ -1121,7 +1126,7 @@ export default function DateCalendar({
                                     <div
                                         key={format(day, 'yyyy-MM-dd')}
                                         className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center font-medium 
-                                            ${isToday(day) ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}
+                                            ${isToday(day) ? '' : 'bg-gray-50 dark:bg-gray-700'}`}
                                     >
                                         <div className="text-gray-500 dark:text-gray-300">{format(day, 'EEE')}</div>
                                         <div
@@ -1148,7 +1153,7 @@ export default function DateCalendar({
                                             const session = getScheduledSession(day, hour);
                                             const availabilityColor = getAvailabilityColor(count, total, !!session);
                                             const isSelected = selectedTimeSlot === key;
-                                            const isHovered = hoveredDay && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
+                                            const isHovered = hoveredDay !== null && isSameDay(hoveredDay, day) && hoveredTimeSlot === hour;
 
                                             return (
                                                 <TimeSlotCell
@@ -1205,7 +1210,7 @@ export default function DateCalendar({
                             <div key={dateStr} className="border-b border-gray-200 dark:border-gray-600">
                                 <div
                                     className={`p-3 font-medium ${
-                                        isToday(day) ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'bg-gray-50 dark:bg-gray-700'
+                                        isToday(day) ? '' : 'bg-gray-50 dark:bg-gray-700'
                                     } cursor-pointer`}
                                     onClick={() => toggleExpandDay(dateStr)}
                                 >
@@ -1279,13 +1284,13 @@ export default function DateCalendar({
                                                     // Directly call toggleAvailability to toggle cell state
                                                     onCellClick={() => !isPast && toggleAvailability(day, hour)}
                                                     // Remove the preventDefault to allow normal touch behavior
-                                                    onTouchStart={(e) => {
+                                                    onTouchStart={() => {
                                                         if (!isPast) {
                                                             // Don't call preventDefault here
                                                             // Don't use the drag system for mobile
                                                         }
                                                     }}
-                                                    onTouchMove={(e) => {
+                                                    onTouchMove={() => {
                                                         // Keep empty to prevent drag behavior on mobile
                                                     }}
                                                     availableUsers={availableUsers}
@@ -1314,8 +1319,6 @@ export default function DateCalendar({
                         timeFormat={timeFormat}
                         onScheduleNewSession={isAdmin && onScheduleSession ? () => onScheduleSession(new Date()) : undefined}
                         isAdmin={isAdmin}
-                        maxPreviousSessions={maxPreviousSessions}
-                        maxFutureSessions={maxFutureSessions}
                     />
                 </div>
             </div>

@@ -1,6 +1,6 @@
 // src/app/components/CellWithTooltip.tsx
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
 
 interface CellWithTooltipProps {
@@ -48,7 +48,44 @@ const CellWithTooltip: React.FC<CellWithTooltipProps> = ({
                                                          }) => {
     const [showTooltip, setShowTooltip] = useState(false);
     const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+    const [tooltipPosition] = useState({ x: '50%', y: '-120%' });
+    const [arrowOffset, setArrowOffset] = useState('50%');
+    const cellRef = useRef<HTMLDivElement>(null);
+    const tooltipRef = useRef<HTMLDivElement>(null);
     const key = `${dateStr}-${hour}`;
+
+    // Utility function to truncate text
+    const truncateText = (text: string, maxLength: number): string => {
+        if (text.length <= maxLength) return text;
+        console.log("truncating...: ", text);
+        return text.slice(0, maxLength - 3) + '...';
+    };
+
+    useEffect(() => {
+        if (showTooltip && cellRef.current && tooltipRef.current) {
+            const cellRect = cellRef.current.getBoundingClientRect();
+            const tooltipRect = tooltipRef.current.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+
+            // Calculate the center of the cell
+            const cellCenter = cellRect.left + cellRect.width / 2;
+
+            // Calculate tooltip position
+            let tooltipX = cellCenter - tooltipRect.width / 2;
+
+            // Check if tooltip would overflow the viewport
+            if (tooltipX < 0) {
+                tooltipX = 0;
+            } else if (tooltipX + tooltipRect.width > viewportWidth) {
+                tooltipX = viewportWidth - tooltipRect.width;
+            }
+
+            // Calculate arrow position to always point to cell center
+            const arrowPos = cellCenter - tooltipX;
+
+            setArrowOffset(`${arrowPos}px`);
+        }
+    }, [showTooltip]);
 
     // Tooltip functions
     const handleMouseEnterWithTooltip = () => {
@@ -101,6 +138,7 @@ const CellWithTooltip: React.FC<CellWithTooltipProps> = ({
 
     return (
         <div
+            ref={cellRef}
             data-time-slot={key}
             className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center relative
                 ${!isPast ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}
@@ -125,32 +163,47 @@ const CellWithTooltip: React.FC<CellWithTooltipProps> = ({
                     <span className="h-6 w-6 rounded-full bg-gray-200 dark:bg-gray-600"></span>
                 }
                 <span className="text-xs text-gray-700 dark:text-gray-300 mt-1">
-                    {count}/{total} {session && `• ${session.title}`}
+                    {count}/{total} {session && `• ${truncateText(session.title, 20)}`}
                 </span>
             </div>
 
             {/* Availability tooltip */}
             {showTooltip && (
                 <div
-                    className="absolute z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 w-64 transition-opacity"
+                    ref={tooltipRef}
+                    className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 w-64 transition-opacity"
                     style={{
-                        left: '50%',
-                        top: '-120%',
+                        left: tooltipPosition.x,
+                        top: tooltipPosition.y,
                         transform: 'translateX(-50%)'
                     }}
                 >
-                    {/* Arrow pointing to the cell */}
+                    {/* Arrow pointing to the cell - this stays in the middle */}
                     <div
                         className="absolute w-3 h-3 bg-white dark:bg-gray-800 transform rotate-45"
                         style={{
                             bottom: '-6px',
-                            left: 'calc(50% - 6px)'
+                            left: arrowOffset,
+                            transform: 'translateX(-50%) rotate(45deg)'
                         }}
                     />
 
                     <div className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                         {format(day, 'EEE, MMM d')} at {displayTime(hour)}
                     </div>
+
+                    {session && (
+                        <div className="mb-3 p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded border border-indigo-200 dark:border-indigo-800">
+                            <div className="font-medium text-indigo-700 dark:text-indigo-300">
+                                Session: {truncateText(session.title, 20)}
+                            </div>
+                            {session.notes && (
+                                <div className="text-sm text-indigo-600 dark:text-indigo-400">
+                                    {truncateText(session.notes, 50)}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>

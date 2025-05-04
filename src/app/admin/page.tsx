@@ -30,15 +30,8 @@ interface Campaign {
     name: string;
 }
 
-interface ActiveUser {
-    username: string;
-    lastActive: number;
-    status: 'active' | 'away' | 'inactive';
-}
-
 export default function AdminDashboard() {
     const [users, setUsers] = useState<User[]>([]);
-    const [, setActiveUsers] = useState<ActiveUser[]>([]);
     const [announcement, setAnnouncement] = useState({
         text: '',
         color: 'yellow',
@@ -182,22 +175,6 @@ export default function AdminDashboard() {
         };
 
         fetchData();
-
-        // Set up polling for active users
-        const interval = setInterval(async () => {
-            try {
-                const response = await fetch('/api/admin/active-users');
-                const data = await response.json();
-
-                if (data.success) {
-                    setActiveUsers(data.activeUsers);
-                }
-            } catch (err) {
-                console.error('Error fetching active users:', err);
-            }
-        }, 30000); // Every 30 seconds
-
-        return () => clearInterval(interval);
     }, [router]);
 
     // Fetch campaign-specific data when selected campaign changes
@@ -400,22 +377,26 @@ export default function AdminDashboard() {
     };
 
     // Handle deleting a poll
+
     const handleDeletePoll = async (pollId: string) => {
         try {
-            const response = await fetch(`/api/polls?id=${pollId}`, {
+            // Use the correct route with poll ID
+            const response = await fetch(`/api/polls/${pollId}`, {
                 method: 'DELETE',
             });
 
             const data = await response.json();
 
             if (data.success) {
-                // Refresh polls
+                // Refresh polls after deletion
                 const updatedResponse = await fetch(`/api/polls?campaignId=${selectedCampaign}`);
                 const updatedData = await updatedResponse.json();
 
                 if (updatedData.success) {
                     setPolls(updatedData.polls);
                 }
+            } else {
+                console.error('Failed to delete poll:', data.error);
             }
         } catch (err) {
             console.error('Error deleting poll:', err);
@@ -946,7 +927,7 @@ export default function AdminDashboard() {
                                 ) : (
                                     // View mode
                                     <>
-                                        <div className="flex items-center">
+                                        <td className="flex items-center px-4 py-2">
                                             {user.username}
                                             {user.contactRequested && (
                                                 <span className="ml-2 flex">
@@ -960,7 +941,7 @@ export default function AdminDashboard() {
                                                     </button>
                                                 </span>
                                             )}
-                                        </div>
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
                                             {user.displayName || '-'}
                                         </td>
