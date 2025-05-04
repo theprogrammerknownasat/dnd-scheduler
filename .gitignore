@@ -36,3 +36,5 @@ next-env.d.ts
 # data directory (store user data)
 /data
 /exports
+
+*.tar

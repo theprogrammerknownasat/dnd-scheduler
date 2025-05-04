@@ -8,7 +8,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - MONGODB_URI=mongodb://mongo:27017/dnd-scheduler
+      - MONGODB_URI=mongodb://mongo:27017/dnd-scheduler  # Container-to-container connection
     depends_on:
       - mongo
     restart: unless-stopped
