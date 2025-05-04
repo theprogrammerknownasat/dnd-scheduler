@@ -1,148 +1,125 @@
-# DnD Scheduler - Enhanced Version
+# DnD Scheduler
 
-A comprehensive web application for scheduling D&D sessions with your group. This app helps players indicate their availability and makes it easy to find the best time for everyone to play.
+A mobile-friendly web application for scheduling D&D sessions with your group. This app helps players indicate their availability and makes it easy for DMs to find the best time for everyone to play.
 
-## Features
+## Core Features
 
-- **User Authentication System**
-   - Login/password management
-   - Password setting for new users
-   - Admin account for site management
+### Availability Management
+- Mark your availability on a time-slot calendar
+- See when other players are available
+- Drag to select multiple time slots at once
+- Visual heat map showing group availability
+- Mobile-optimized interface with expandable days
 
-- **Date-Based Calendar**
-   - Infinite scrolling calendar with real dates
-   - Weekly view with mobile optimization
-   - Visual indicators for user availability
-   - Overview of all users' availability
+### Session Scheduling
+- DMs can schedule sessions at times when most players are available
+- Session details include title, time, and optional notes
+- Upcoming and past sessions are clearly displayed
+- Everyone can see scheduled sessions at a glance
 
-- **Admin Dashboard**
-   - User management (add, edit, delete users)
-   - Admin password management
-   - Announcement system with color options
-   - Poll creation and management
-   - Settings configuration
+### Group Management
+- Campaign-based organization for different D&D groups
+- Multiple campaigns support for players in various groups
+- Admin tools for managing users and campaigns
+- Automatic tracking of active users
 
-- **Polls System**
-   - Regular polls with visible results
-   - Blind polls where results are hidden until voting
-   - Visual result display
+### Polls & Communication
+- Create polls for group decision making
+- Support for regular and blind polls with visible/hidden results
+- Campaign announcements for important updates
+- Color-coded announcements for different priority levels
 
-- **Theme Support**
-   - Dark/light mode toggle
-   - System preference detection
-   - Theme persistence
+## User Experience
 
-- **Mobile-First Design**
-   - Responsive layouts for all screen sizes
-   - Optimized calendar view for mobile devices
+### Players Can:
+- Mark and update their availability with simple clicks/taps
+- See when their friends are available
+- Get notified of scheduled sessions
+- Vote on polls
+- Switch between campaigns if they belong to multiple groups
+- Customize display preferences in their profile
 
-## Tech Stack
+### DMs Can:
+- See when most players are available for scheduling
+- Create and manage sessions
+- Create polls for group decisions
+- Post announcements for the campaign
+- Manage which players are in their campaign
 
-- **Next.js** (React framework with both frontend and backend)
-- **TypeScript** for type safety
-- **Tailwind CSS** for styling
-- **MongoDB** for data storage
-- **date-fns** for date manipulation
+### Admins Can:
+- Manage all users across the platform
+- Create and configure campaigns
+- Assign DM privileges
+- Monitor site activity and usage
+- Configure global settings
+
+## Technical Details
+
+### Built With:
+- **Next.js 13+** with App Router for both frontend and API routes
+- **TypeScript** for type safety and code quality
+- **TailwindCSS** for responsive styling
+- **MongoDB** for database storage
+- **date-fns** for comprehensive date handling
+
+### Key Features:
+- Responsive design works on mobile, tablet, and desktop
+- Dark mode and light mode support with system preference detection
+- Real-time availability visualization
+- Optimized calendar views for different screen sizes
 
 ## Getting Started
 
 ### Prerequisites
-
-- Node.js 16+ and npm
-- MongoDB (local installation or MongoDB Atlas account)
+- Node.js 18+ and npm
+- MongoDB connection (local or Atlas)
 
 ### Installation
-
-1. Clone the repository:
+1. Clone the repository
    ```
-   git clone https://github.com/theprogrammerknownasat/dnd-scheduler.git
+   git clone https://github.com/yourusername/dnd-scheduler.git
    cd dnd-scheduler
    ```
 
-2. Install dependencies:
+2. Install dependencies
    ```
    npm install
    ```
 
-3. Set up environment variables:
-   Create a `.env.local` file in the root directory with the following:
+3. Set up environment variables by creating a `.env.local` file:
    ```
-   MONGODB_URI=mongodb://localhost:27017/dnd-scheduler
+   MONGODB_URI=your_mongodb_connection_string
+   JWT_SECRET=your_secret_key_for_tokens
    ```
-   Replace the URI with your MongoDB connection string if using a remote database.
 
-4. Run the development server:
+4. Run the development server
    ```
    npm run dev
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+5. Navigate to `http://localhost:3000` in your browser
 
-### Database Setup
-
-If migrating from the old JSON-based storage:
-
-1. Install MongoDB client for the migration script:
-   ```
-   npm install mongodb
-   ```
-
-2. Run the migration script:
-   ```
-   node scripts/migrate-to-mongodb.js
-   ```
-
-If starting fresh, the app will automatically create:
-- An admin user with username "admin" and no password
-- You'll be prompted to set the admin password on first login
-
-## Usage Guide
-
-### Initial Setup
-
-1. Log in with username "admin" (no password)
-2. Set a password when prompted
-3. Use the admin dashboard to add your players
-4. Configure available weeks in the future (default is 12 weeks)
-
-### User Experience
-
-1. Players log in with the username provided by the admin
-2. On first login, they set their own password
-3. Players mark their availability on the calendar
-4. Players can view when others are available
-5. Players can participate in polls
-
-### Admin Features
-
-#### User Management
-- Add new players by username
-- Edit usernames and reset passwords
-- Delete user accounts (except admin)
-- View active users currently on the site
-
-#### Announcements
-- Create announcements visible to all users
-- Select announcement color (yellow, red, green, blue)
-- Clear announcements when no longer needed
-
-#### Polls
-- Create regular or blind polls
-- View poll results
-- Delete polls when completed
-
-#### Settings
-- Set maximum weeks visible in the future
-- Change admin password
+### First-Time Setup
+When first accessing the application:
+1. You'll be prompted to create an admin account
+2. Use the admin tools to create campaigns and add users
+3. Add players to campaigns
+4. Players can then set their availability
 
 ## Deployment
+This application can be deployed on Vercel, Netlify, or any platform supporting Next.js:
 
-This app can be deployed on Vercel, Netlify, or any platform that supports Next.js applications. Make sure to set up your environment variables on your hosting platform.
+1. Connect your Git repository to your preferred hosting platform
+2. Configure the environment variables
+3. Deploy from your main branch
 
-## Contributing
+## Screenshots
 
-Feel free to submit issues or pull requests if you want to contribute to the project.
+*(Screenshots will be added here to showcase the application's interface)*
 
 ## License
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-This project is licensed under the MIT License.
+## Acknowledgments
+- Thanks to the D&D community for inspiring this project
+- Built with the needs of busy player groups in mind

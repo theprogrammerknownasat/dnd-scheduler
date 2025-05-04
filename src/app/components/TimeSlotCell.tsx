@@ -50,11 +50,6 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
     const isFullAvailability = count === total && count > 0;
 
     // Log session info for debugging
-    useEffect(() => {
-        if (session) {
-            console.log(`TimeSlotCell rendering with session: ${session.title} at ${dateStr}-${hour}`);
-        }
-    }, [session, dateStr, hour]);
 
     // Tooltip functions with delays adjusted for better usability
     const handleMouseEnterWithTooltip = () => {
@@ -112,6 +107,7 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
             }
         };
     }, [longPressTimer]);
+
 
     // Get available/unavailable users for tooltip
     const {availableUsers, unavailableUsers} = getAvailableUsers(day, hour);

@@ -99,20 +99,18 @@ const CellWithTooltip: React.FC<CellWithTooltipProps> = ({
         }
     };
 
-    // In CellWithTooltip.tsx
-
-// Update the return statement to include session overlay
     return (
         <div
             data-time-slot={key}
             className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center relative
-            ${!isPast ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}
-            ${isAvailable ? 'bg-green-50 dark:bg-green-900/20' : ''}
-            ${isToday ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}
-            ${availabilityColor}
-            ${isSelected ? 'ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}
-            ${isHovered ? 'ring-2 ring-gray-400 dark:ring-gray-500' : ''}
-        `}
+                ${!isPast ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}
+                ${isAvailable ? 'bg-green-50 dark:bg-green-900/20' : ''}
+                ${isToday ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}
+                ${session ? 'bg-indigo-100 dark:bg-indigo-900/30 border-l-4 border-indigo-500' : ''}
+                ${availabilityColor}
+                ${isSelected ? 'ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}
+                ${isHovered ? 'ring-2 ring-gray-400 dark:ring-gray-500' : ''}
+            `}
             onClick={onCellClick}
             onMouseDown={onMouseDown}
             onMouseEnter={handleMouseEnterWithTooltip}
@@ -120,21 +118,15 @@ const CellWithTooltip: React.FC<CellWithTooltipProps> = ({
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
         >
-            {/* Add session overlay */}
-            {session && (
-                <div className="absolute inset-0 bg-indigo-300/40 dark:bg-indigo-600/40 z-0 pointer-events-none"></div>
-            )}
-
-            <div className="flex flex-col items-center relative z-10">
+            <div className="flex flex-col items-center">
                 {isAvailable ?
-                    <span
-                        className="h-6 w-6 rounded-full bg-green-500 text-white flex items-center justify-center">✓</span>
+                    <span className="h-6 w-6 rounded-full bg-green-500 text-white flex items-center justify-center">✓</span>
                     :
                     <span className="h-6 w-6 rounded-full bg-gray-200 dark:bg-gray-600"></span>
                 }
                 <span className="text-xs text-gray-700 dark:text-gray-300 mt-1">
-                {count}/{total} {session && `• ${session.title}`}
-            </span>
+                    {count}/{total} {session && `• ${session.title}`}
+                </span>
             </div>
 
             {/* Availability tooltip */}
@@ -160,18 +152,6 @@ const CellWithTooltip: React.FC<CellWithTooltipProps> = ({
                         {format(day, 'EEE, MMM d')} at {displayTime(hour)}
                     </div>
 
-                    {/* Add session info to tooltip */}
-                    {session && (
-                        <div className="p-2 mb-2 bg-indigo-50 dark:bg-indigo-900/20 border-l-2 border-indigo-500">
-                            <div className="font-medium text-indigo-700 dark:text-indigo-300">
-                                Session: {session.title}
-                            </div>
-                            <div className="text-xs text-indigo-600 dark:text-indigo-400">
-                                {displayTime(session.startTime)} - {displayTime(session.endTime)}
-                            </div>
-                        </div>
-                    )}
-
                     <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
                             <h4 className="font-medium text-green-600 dark:text-green-400">Available ({count})</h4>
@@ -190,8 +170,7 @@ const CellWithTooltip: React.FC<CellWithTooltipProps> = ({
                         </div>
 
                         <div>
-                            <h4 className="font-medium text-red-600 dark:text-red-400">Unavailable
-                                ({total - count})</h4>
+                            <h4 className="font-medium text-red-600 dark:text-red-400">Unavailable ({total - count})</h4>
                             {total - count > 0 ? (
                                 <ul className="text-gray-600 dark:text-gray-400 space-y-1 mt-1">
                                     {unavailableUsers.map(name => (
@@ -210,6 +189,6 @@ const CellWithTooltip: React.FC<CellWithTooltipProps> = ({
             )}
         </div>
     );
-}
+};
 
 export default CellWithTooltip;

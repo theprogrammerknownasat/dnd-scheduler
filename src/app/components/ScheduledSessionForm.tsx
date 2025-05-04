@@ -28,6 +28,9 @@ export default function ScheduledSessionForm({
     const [error, setError] = useState('');
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [currentMonth, setCurrentMonth] = useState(initialDate);
+    const [isRecurring, setIsRecurring] = useState(false);
+    const [recurringDays, setRecurringDays] = useState(7); // Default to weekly
+    const [maxRecurrences, setMaxRecurrences] = useState(3); // Default to 3 recurrences
 
     const datePickerRef = useRef<HTMLDivElement>(null);
 
@@ -83,6 +86,11 @@ export default function ScheduledSessionForm({
         return [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
     };
 
+    // Format time based on user preference
+    const displayTime = (hour: number) => {
+        return formatTime(hour, timeFormat);
+    };
+
     // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -110,7 +118,10 @@ export default function ScheduledSessionForm({
                     date: format(date, 'yyyy-MM-dd'),
                     startTime,
                     endTime,
-                    notes
+                    notes,
+                    isRecurring,
+                    recurringDays,
+                    maxRecurrences
                 }),
             });
 
@@ -269,7 +280,7 @@ export default function ScheduledSessionForm({
                                 >
                                     {timeSlots.map((hour) => (
                                         <option key={hour} value={hour}>
-                                            {formatTime(hour)}
+                                            {displayTime(hour)}
                                         </option>
                                     ))}
                                 </select>
@@ -286,7 +297,7 @@ export default function ScheduledSessionForm({
                                 >
                                     {timeSlots.map((hour) => (
                                         <option key={hour} value={hour}>
-                                            {formatTime(hour)}
+                                            {displayTime(hour)}
                                         </option>
                                     ))}
                                 </select>
@@ -305,6 +316,62 @@ export default function ScheduledSessionForm({
                                 placeholder="Any additional information about the session"
                                 rows={3}
                             />
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    id="isRecurring"
+                                    checked={isRecurring}
+                                    onChange={(e) => setIsRecurring(e.target.checked)}
+                                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                />
+                                <label htmlFor="isRecurring" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                                    Make this a recurring session
+                                </label>
+                            </div>
+
+                            {isRecurring && (
+                                <div className="pl-6 space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Repeat every
+                                        </label>
+                                        <div className="flex items-center space-x-2">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="30"
+                                                value={recurringDays}
+                                                onChange={(e) => setRecurringDays(parseInt(e.target.value) || 1)}
+                                                className="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded
+                                bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                            />
+                                            <span className="text-sm text-gray-700 dark:text-gray-300">days</span>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Number of sessions (including this one)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="2"
+                                            max="12"
+                                            value={maxRecurrences}
+                                            onChange={(e) => setMaxRecurrences(parseInt(e.target.value) || 2)}
+                                            className="w-32 p-2 border border-gray-300 dark:border-gray-600 rounded
+                            bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        />
+                                    </div>
+
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                        This will create {maxRecurrences} sessions, occurring every {recurringDays} days.
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex justify-end space-x-3">

@@ -1,19 +1,36 @@
-// src/utils/dateTimeFormatter.ts
+// src/utils/dateTimeFormatter.ts - Optimized version
+import { convertFromEasternToLocal, isUserInEasternTime } from './timezoneUtils';
+
+// Format time with caching
+const timeCache = new Map<string, string>();
 
 // Format time (hour number to display time)
 export function formatTime(hour: number, format: '12h' | '24h' = '12h'): string {
+    const cacheKey = `${hour}-${format}`;
+
+    if (timeCache.has(cacheKey)) {
+        return timeCache.get(cacheKey)!;
+    }
+
+    // Convert EST hour to user's local hour
+    const localHour = convertFromEasternToLocal(hour);
+
     // Check if it's a half hour
-    const isHalf = !Number.isInteger(hour);
-    const hourNum = Math.floor(hour);
+    const isHalf = !Number.isInteger(localHour);
+    const hourNum = Math.floor(localHour);
     const minutes = isHalf ? '30' : '00';
 
+    let result: string;
     if (format === '12h') {
         const period = hourNum >= 12 ? 'PM' : 'AM';
         const displayHour = hourNum % 12 || 12;
-        return `${displayHour}:${minutes} ${period}`;
+        result = `${displayHour}:${minutes} ${period}`;
     } else {
-        return `${hourNum.toString().padStart(2, '0')}:${minutes}`;
+        result = `${hourNum.toString().padStart(2, '0')}:${minutes}`;
     }
+
+    timeCache.set(cacheKey, result);
+    return result;
 }
 
 // Format time range (start and end hours)
@@ -21,7 +38,13 @@ export function formatTimeRange(startHour: number, endHour: number, format: '12h
     return `${formatTime(startHour, format)} - ${formatTime(endHour, format)}`;
 }
 
-// Format a timestamp (ISO string) to a relative or absolute time
+// Display timezone indicator (only if not in EST) - cached
+const timezoneText = isUserInEasternTime() ? '' : ` (Your local time)`;
+
+export function getTimezoneDisplayText(): string {
+    return timezoneText;
+}
+
 export function formatTimestamp(timestamp: string): string {
     const date = new Date(timestamp);
     const now = new Date();

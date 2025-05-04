@@ -1,4 +1,4 @@
-// src/app/api/admin/users/[id]/route.ts (updated to handle displayName)
+// src/app/api/admin/users/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import dbConnect from '@/lib/mongodb';
@@ -7,11 +7,10 @@ import User from '@/models/User';
 // Update user (admin only)
 export async function PUT(
     request: Request,
-    context: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { params } = context;
-        const id = params.id;
+        const { id } = await params;
         const cookieStore = await cookies();
         const isAdmin = cookieStore.get('isAdmin')?.value === 'true';
 
@@ -22,8 +21,29 @@ export async function PUT(
             );
         }
 
-        const { username, displayName, password } = await request.json();
+        const body = await request.json();
+        const { username, displayName, password, contactRequested } = body;
 
+        // If this is just a contact request dismiss, handle it separately
+        if ('contactRequested' in body && Object.keys(body).length === 1) {
+            await dbConnect();
+            const user = await User.findByIdAndUpdate(
+                id,
+                { contactRequested },
+                { new: true }
+            );
+
+            if (!user) {
+                return NextResponse.json(
+                    { success: false, error: 'User not found' },
+                    { status: 404 }
+                );
+            }
+
+            return NextResponse.json({ success: true });
+        }
+
+        // Original logic for full user updates
         if (!username) {
             return NextResponse.json(
                 { success: false, error: 'Username is required' },
@@ -78,3 +98,4 @@ export async function PUT(
         );
     }
 }
+

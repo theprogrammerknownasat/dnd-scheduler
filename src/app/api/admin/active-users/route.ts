@@ -24,7 +24,6 @@ export function updateActiveUser(username: string) {
     return true;
 }
 
-
 // Clean up inactive users (10 minute timeout)
 function cleanupInactiveUsers() {
     const now = Date.now();
@@ -38,18 +37,6 @@ function cleanupInactiveUsers() {
         }
     });
 }
-
-function logActiveUser(username: string) {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] *** ACTIVE USER: ${username} ***`);
-}
-
-function logActiveUsersList() {
-    const users = Object.keys(activeUsers);
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] === ACTIVE USERS (${users.length}): ${users.join(', ')} ===`);
-}
-
 
 export async function GET() {
     try {

@@ -1,181 +1,134 @@
-// CurrentTimeIndicator.tsx
+// src/app/components/CurrentTimeIndicator.tsx
 import React, { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 
 interface CurrentTimeIndicatorProps {
     calendarRef: React.RefObject<HTMLDivElement>;
-    timeSlots: number[];
-    isVisible: boolean; // Only show on current day
     timeFormat: '12h' | '24h';
-    isMobile?: boolean;
-    expandedDay?: string | null;
 }
 
 const CurrentTimeIndicator: React.FC<CurrentTimeIndicatorProps> = ({
                                                                        calendarRef,
-                                                                       timeSlots,
-                                                                       isVisible,
-                                                                       timeFormat,
-                                                                       isMobile = false,
-                                                                       expandedDay = null
+                                                                       timeFormat
                                                                    }) => {
     const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
     const [currentTime, setCurrentTime] = useState('');
-    const [currentDate, setCurrentDate] = useState('');
+    const [isVisible, setIsVisible] = useState(false);
 
     // Calculate position based on current time
     const updatePosition = () => {
-        if (!isVisible || !calendarRef.current) return;
+        if (!calendarRef.current) {
+            return;
+        }
 
         const now = new Date();
         const hours = now.getHours();
         const minutes = now.getMinutes();
 
-        // Format date for checking if today is expanded day in mobile view
-        setCurrentDate(format(now, 'yyyy-MM-dd'));
-
-        // Format time for display based on user's preference
+        // Format time for display
         if (timeFormat === '12h') {
             setCurrentTime(format(now, 'h:mm a'));
         } else {
             setCurrentTime(format(now, 'HH:mm'));
         }
 
-        // Calculate position
-        const currentHour = hours + minutes / 60; // Ex: 14.5 for 2:30 PM
+        // Calculate decimal hour (e.g., 14.5 for 2:30 PM)
+        const currentDecimalHour = hours + (minutes / 60);
 
-        // For mobile view, we need different positioning
-        if (isMobile) {
-            // Only proceed if today is the expanded day
-            if (expandedDay !== currentDate) return;
+        // Only show indicator between 8 AM and 10 PM
+        if (currentDecimalHour < 8 || currentDecimalHour >= 22) {
+            setIsVisible(false);
+            return;
+        }
 
-            // Find all time cells for today
-            const todayCells = calendarRef.current.querySelectorAll(`[data-date="${currentDate}"]`);
-            if (todayCells.length === 0) return;
+        setIsVisible(true);
 
-            // Find the cell closest to current time
-            let targetCell: Element | null = null;
-            let closestDiff = Infinity;
+        // Get time slot cells for today
+        const todayStr = format(now, 'yyyy-MM-dd');
+        const timeSlotCells = Array.from(
+            calendarRef.current.querySelectorAll(`[data-time-slot*="${todayStr}"]`)
+        );
 
-            todayCells.forEach(cell => {
-                const hourAttr = cell.getAttribute('data-hour');
-                if (!hourAttr) return;
+        if (timeSlotCells.length === 0) {
+            setIsVisible(false);
+            return;
+        }
 
-                const cellHour = parseFloat(hourAttr);
-                const diff = Math.abs(cellHour - currentHour);
+        // Calculate position between time slots
+        const slotIndex = Math.floor(currentDecimalHour - 8);
+        const progressInHour = (currentDecimalHour - Math.floor(currentDecimalHour));
 
-                if (diff < closestDiff) {
-                    closestDiff = diff;
-                    targetCell = cell;
-                }
-            });
+        // Get current and next time slot cells
+        const currentCell = timeSlotCells[slotIndex] as HTMLElement;
+        const nextCell = timeSlotCells[slotIndex + 1] as HTMLElement;
 
-            if (targetCell) {
-                const rect = targetCell.getBoundingClientRect();
-                const containerRect = calendarRef.current.getBoundingClientRect();
+        if (!currentCell) {
+            setIsVisible(false);
+            return;
+        }
 
-                // Calculate position
-                const hourFraction = currentHour - parseFloat(targetCell.getAttribute('data-hour') || '0');
-                const topPosition = rect.top - containerRect.top + (rect.height * hourFraction);
+        // Get positions
+        const calendarRect = calendarRef.current.getBoundingClientRect();
+        const currentCellRect = currentCell.getBoundingClientRect();
+        const cellHeight = currentCellRect.height;
+        const cellTop = currentCellRect.top - calendarRect.top;
 
-                setPosition({
-                    top: topPosition,
-                    left: 0,
-                    width: containerRect.width
-                });
-            }
-        } else {
-            // Desktop view
-            // Find the cell for the current hour
-            let closestCell: Element | null = null;
-            let closestHour = Infinity;
+        // Calculate exact position
+        let topPosition = cellTop;
+        if (nextCell) {
+            topPosition += progressInHour * cellHeight;
+        }
 
-            // Query all hour cells
-            const hourCells = calendarRef.current.querySelectorAll('[data-time-slot]');
-            hourCells.forEach(cell => {
-                const slotKey = cell.getAttribute('data-time-slot');
-                if (!slotKey) return;
-
-                const [dateStr, hourStr] = slotKey.split('-');
-                // Only consider cells for today
-                if (dateStr !== currentDate) return;
-
-                const cellHour = parseFloat(hourStr);
-                const diff = Math.abs(cellHour - currentHour);
-
-                if (diff < closestHour) {
-                    closestHour = diff;
-                    closestCell = cell;
-                }
-            });
-
-            if (closestCell) {
-                const cellHour = parseFloat(closestCell.getAttribute('data-time-slot')?.split('-')[1] || '0');
-                const rect = closestCell.getBoundingClientRect();
-                const calendarRect = calendarRef.current.getBoundingClientRect();
-
-                // Calculate how far through the hour we are (0-1)
-                const hourFraction = currentHour - cellHour;
-
-                // Find the left edge (where time labels are)
-                const timeLabels = calendarRef.current.querySelectorAll('[data-time-label]');
-                let leftEdge = 0;
-                if (timeLabels.length > 0) {
-                    const labelRect = timeLabels[0].getBoundingClientRect();
-                    leftEdge = labelRect.right - calendarRect.left;
-                }
-
-                // Calculate position
-                const topPosition = rect.top - calendarRect.top + (rect.height * hourFraction);
-
-                setPosition({
-                    top: topPosition,
-                    left: leftEdge,
-                    width: calendarRect.width - leftEdge
-                });
+        // Find the left edge (skip the time labels column)
+        let leftPosition = currentCellRect.width;
+        const calendar = calendarRef.current;
+        if (calendar) {
+            // Find the first data cell (not a time label)
+            const firstDataCell = calendar.querySelector('[data-time-slot]:not([data-time-slot$=""])');
+            if (firstDataCell) {
+                const firstCellRect = firstDataCell.getBoundingClientRect();
+                leftPosition = firstCellRect.left - calendarRect.left;
             }
         }
+
+        setPosition({
+            top: topPosition,
+            left: leftPosition,
+            width: calendarRect.width - leftPosition
+        });
     };
 
-    // Update on mount and every minute thereafter
+    // Update on mount and every minute
     useEffect(() => {
-        // Initial update
         updatePosition();
 
-        // Update every minute
-        const interval = setInterval(updatePosition, 60000);
+        const interval = setInterval(() => {
+            updatePosition();
+        }, 60000); // Update every minute
 
-        // Clean up interval on unmount
         return () => clearInterval(interval);
-    }, [isVisible, calendarRef.current, expandedDay]);
+    }, [calendarRef.current, timeFormat]);
 
-    // Don't render if not visible
     if (!isVisible) return null;
 
-    // For mobile, only show if the expanded day is today
-    if (isMobile && expandedDay !== currentDate) return null;
-
     return (
-        <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ zIndex: 50 }}>
-            {/* The time indicator line */}
-            <div
-                className="absolute flex items-center"
-                style={{
-                    top: `${position.top}px`,
-                    left: `${position.left}px`,
-                    width: `${position.width}px`,
-                }}
-            >
-                {/* Triangle pointer */}
-                <div className="h-5 flex items-center">
-                    <div className="h-3 w-3 bg-red-500 transform rotate-45 relative -left-1.5" />
-                </div>
+        <div
+            className="absolute pointer-events-none z-40"
+            style={{
+                top: `${position.top}px`,
+                left: `${position.left}px`,
+                width: `${position.width}px`,
+            }}
+        >
+            <div className="flex items-center h-0">
+                {/* Left marker */}
+                <div className="bg-red-500 h-3 w-3 rounded-full"></div>
 
-                {/* The actual line */}
-                <div className="h-[2px] bg-red-500 flex-grow" />
+                {/* Horizontal line */}
+                <div className="flex-grow h-[2px] bg-red-500"></div>
 
-                {/* Time display */}
-                <div className="bg-red-500 text-white text-xs px-1 py-0.5 rounded ml-1">
+                {/* Time label */}
+                <div className="bg-red-500 text-white text-xs px-2 py-1 rounded">
                     {currentTime}
                 </div>
             </div>

@@ -1,4 +1,5 @@
-// src/app/components/MobileCellWithTooltip.tsx
+// MobileCellWithTooltip.tsx
+// Add data attributes for time indicator
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
@@ -44,6 +45,7 @@ const MobileCellWithTooltip: React.FC<MobileCellWithTooltipProps> = ({
     const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
     const key = `${dateStr}-${hour}`;
     const isTooltipShowingRef = useRef<boolean>(false);
+    const cellRef = useRef<HTMLDivElement>(null);
 
     const handleTouchStartWithTooltip = (e: React.TouchEvent) => {
         if (isPast) return;
@@ -166,15 +168,24 @@ const MobileCellWithTooltip: React.FC<MobileCellWithTooltipProps> = ({
         });
     };
 
+    // Track full availability for proper styling
+    const isFullAvailability = count === total && count > 0;
+
     return (
         <div
+            ref={cellRef}
             data-time-slot={key}
+            data-date={dateStr}
+            data-hour={hour}
+            data-has-session={session ? 'true' : 'false'}
+            data-full-availability={isFullAvailability ? 'true' : 'false'}
             className={`p-3 flex justify-between items-center relative
-        ${!isPast ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}
-        ${availabilityColor}
-        ${session ? 'border-l-4 border-blue-500' : ''}
-        ${isSelected ? 'ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}
-    `}
+                ${!isPast ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}
+                ${availabilityColor}
+                ${isFullAvailability ? '!bg-green-700 dark:!bg-green-800' : ''}
+                ${session ? 'border-l-4 border-blue-500' : ''}
+                ${isSelected ? 'ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}
+            `}
             onTouchStart={handleTouchStartWithTooltip}
             onTouchMove={onTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -185,6 +196,7 @@ const MobileCellWithTooltip: React.FC<MobileCellWithTooltipProps> = ({
                 }
             }}
         >
+            {/* Session highlight */}
             {session && (
                 <div className="absolute inset-0 bg-blue-200/40 dark:bg-blue-800/30 z-0 pointer-events-none"></div>
             )}
@@ -193,19 +205,19 @@ const MobileCellWithTooltip: React.FC<MobileCellWithTooltipProps> = ({
                 <span className="text-gray-700 dark:text-gray-300">{displayTime(hour)}</span>
                 {session && (
                     <span className="ml-2 text-sm text-blue-600 dark:text-blue-400 font-medium">
-                    {session.title}
-                </span>
+                        {session.title}
+                    </span>
                 )}
             </div>
             <div className="flex items-center relative z-10">
-            <span className="text-sm text-gray-500 dark:text-gray-400 mr-2">
-                {count}/{total}
-            </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 mr-2">
+                    {count}/{total}
+                </span>
                 <span className={`h-6 w-6 rounded-full flex items-center justify-center ${
                     isAvailable ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-600'
                 }`}>
-                {isAvailable ? '✓' : ''}
-            </span>
+                    {isAvailable ? '✓' : ''}
+                </span>
             </div>
         </div>
     );

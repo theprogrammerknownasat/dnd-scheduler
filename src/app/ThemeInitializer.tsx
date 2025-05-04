@@ -1,21 +1,37 @@
+// src/app/ThemeInitializer.tsx
 "use client";
 import { useEffect } from 'react';
 
-export default function ThemeInitializer() {
+const ThemeInitializer = () => {
+    // Initialize theme
     useEffect(() => {
-        // Check for saved theme preference
-        const savedTheme = localStorage.getItem('theme');
-
-        // Check if user has dark mode preference
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-        // Set initial state based on saved preference or system preference
-        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+        // Check for dark mode preference
+        if (localStorage.theme === 'dark' ||
+            (!('theme' in localStorage) &&
+                window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
         } else {
             document.documentElement.classList.remove('dark');
         }
+
+        // Set up listener for system preference changes
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = (e: MediaQueryListEvent) => {
+            if (!('theme' in localStorage)) {
+                if (e.matches) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }
+        };
+
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
     }, []);
 
+    // This component doesn't render anything visible
     return null;
-}
+};
+
+export default ThemeInitializer;
