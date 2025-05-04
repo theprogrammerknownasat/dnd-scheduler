@@ -21,7 +21,8 @@ const UserSchema: Schema = new Schema(
         isAdmin: { type: Boolean, default: false },
         campaigns: { type: [String], default: [] },
         use24HourFormat: { type: Boolean, default: false },
-        displayNameEditDisabled: { type: Boolean, default: false }
+        displayNameEditDisabled: { type: Boolean, default: false },
+        contactRequested: { type: Boolean, default: false }
     },
     { timestamps: true }
 );

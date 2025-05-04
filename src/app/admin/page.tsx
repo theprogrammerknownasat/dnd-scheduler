@@ -12,6 +12,7 @@ interface User {
     displayName: string;
     isAdmin: boolean;
     password: string | null;
+    contactRequested: boolean;
 }
 
 interface Poll {
@@ -29,9 +30,15 @@ interface Campaign {
     name: string;
 }
 
+interface ActiveUser {
+    username: string;
+    lastActive: number;
+    status: 'active' | 'away' | 'inactive';
+}
+
 export default function AdminDashboard() {
     const [users, setUsers] = useState<User[]>([]);
-    const [activeUsers, setActiveUsers] = useState<string[]>([]);
+    const [, setActiveUsers] = useState<ActiveUser[]>([]);
     const [announcement, setAnnouncement] = useState({
         text: '',
         color: 'yellow',
@@ -70,6 +77,31 @@ export default function AdminDashboard() {
         { name: 'Green', value: 'green' },
         { name: 'Blue', value: 'blue' }
     ];
+
+    const handleDismissContact = async (userId: string) => {
+        try {
+            const response = await fetch(`/api/admin/users/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contactRequested: false }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Refresh users list
+                const updatedResponse = await fetch('/api/admin/users');
+                const updatedData = await updatedResponse.json();
+
+                if (updatedData.success) {
+                    setUsers(updatedData.users);
+                }
+            }
+        } catch (err) {
+            console.error('Error dismissing contact request:', err);
+        }
+    };
+
 
     // Fetch data on component mount
     useEffect(() => {
@@ -116,13 +148,13 @@ export default function AdminDashboard() {
                     setUsers(usersData.users);
                 }
 
-                // Fetch active users
+                /*// Fetch active users
                 const activeUsersResponse = await fetch('/api/admin/active-users');
                 const activeUsersData = await activeUsersResponse.json();
 
                 if (activeUsersData.success) {
                     setActiveUsers(activeUsersData.activeUsers);
-                }
+                }*/
 
                 // Fetch settings
                 const settingsResponse = await fetch('/api/settings');
@@ -536,23 +568,7 @@ export default function AdminDashboard() {
                 {/* Active Users Section */}
                 <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
                     <h2 className="text-lg font-medium mb-4 text-gray-900 dark:text-white">Active Users</h2>
-                    {activeUsers.length > 0 ? (
-                        <ul className="space-y-2">
-                            {activeUsers.map(activeUsername => {
-                                const user = users.find(u => u.username === activeUsername);
-                                const displayName = user?.displayName || activeUsername;
-
-                                return (
-                                    <li key={activeUsername} className="flex items-center">
-                                        <span className="h-2 w-2 bg-green-500 rounded-full mr-2"></span>
-                                        <span className="text-gray-700 dark:text-gray-300">{displayName}</span>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    ) : (
-                        <p className="text-gray-500 dark:text-gray-400">No active users</p>
-                    )}
+                    <p className="text-gray-500 dark:text-gray-400">Active user tracking is currently disabled</p>
                 </div>
 
                 {/* Announcement Section */}
@@ -930,9 +946,21 @@ export default function AdminDashboard() {
                                 ) : (
                                     // View mode
                                     <>
-                                        <td className="px-6 py-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                        <div className="flex items-center">
                                             {user.username}
-                                        </td>
+                                            {user.contactRequested && (
+                                                <span className="ml-2 flex">
+                                                    <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                                    <button
+                                                        onClick={() => handleDismissContact(user._id)}
+                                                        className="ml-2 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                                    >
+                                                        Dismiss
+                                                    </button>
+                                                </span>
+                                            )}
+                                        </div>
                                         <td className="px-6 py-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
                                             {user.displayName || '-'}
                                         </td>

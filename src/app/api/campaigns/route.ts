@@ -6,7 +6,7 @@ import Campaign from '@/models/Campaign';
 import User from '@/models/User';
 import dbConnect from '@/lib/mongodb';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         // Get the username and isAdmin status from cookies
         const cookieStore = await cookies();
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
                 const campaignIds = user.campaigns.map((id: string) => {
                     try {
                         return new mongoose.Types.ObjectId(id);
-                    } catch (err) {
+                    } catch {
                         return null;
                     }
                 }).filter(Boolean);

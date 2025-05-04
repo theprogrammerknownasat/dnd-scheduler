@@ -1,6 +1,7 @@
+// src/app/api/scheduled-sessions/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { parseISO } from 'date-fns';
+import { parseISO, format, addDays } from 'date-fns';
 import dbConnect from '@/lib/mongodb';
 import ScheduledSession from '@/models/ScheduledSession';
 import Campaign from '@/models/Campaign';
@@ -58,13 +59,14 @@ export async function GET(request: Request) {
 
         if (start && end) {
             query.date = {
-                $gte: parseISO(start),
-                $lte: parseISO(end)
+                $gte: start,
+                $lte: end
             };
         }
 
         // Get sessions
         const sessions = await ScheduledSession.find(query).sort({ date: 1, startTime: 1 });
+
 
         return NextResponse.json({
             success: true,
@@ -100,7 +102,18 @@ export async function POST(request: Request) {
             );
         }
 
-        const { campaignId, title, date, startTime, endTime, notes } = await request.json();
+        const body = await request.json();
+        const {
+            campaignId,
+            title,
+            date,
+            startTime,
+            endTime,
+            notes,
+            isRecurring,
+            recurringDays,
+            maxRecurrences
+        } = body;
 
         if (!campaignId || !title || !date || startTime === undefined || endTime === undefined) {
             return NextResponse.json(
@@ -128,20 +141,57 @@ export async function POST(request: Request) {
             );
         }
 
-        // Create session
-        const session = await ScheduledSession.create({
-            campaignId,
-            title,
-            date: parseISO(date),
-            startTime,
-            endTime,
-            notes: notes || ''
-        });
+        if (isRecurring && recurringDays && maxRecurrences) {
+            // Create recurring sessions
+            const sessions = [];
+            const baseDate = parseISO(date);
+            const recurringGroupId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-        return NextResponse.json({
-            success: true,
-            session
-        });
+            for (let i = 0; i < maxRecurrences; i++) {
+                const sessionDate = addDays(baseDate, i * recurringDays);
+                const sessionData = {
+                    title,
+                    date: format(sessionDate, 'yyyy-MM-dd'),
+                    startTime,
+                    endTime,
+                    notes: notes || '',
+                    campaignId,
+                    createdBy: username,
+                    isRecurring: true,
+                    recurringDays,
+                    recurringGroupId,
+                    recurringIndex: i,
+                    maxRecurrences
+                };
+
+                sessions.push(sessionData);
+            }
+
+            const createdSessions = await ScheduledSession.insertMany(sessions);
+
+            return NextResponse.json({
+                success: true,
+                sessions: createdSessions,
+                recurringGroupId
+            });
+        } else {
+            // Create single session
+            const session = await ScheduledSession.create({
+                title,
+                date,
+                startTime,
+                endTime,
+                notes: notes || '',
+                campaignId,
+                createdBy: username,
+                isRecurring: false
+            });
+
+            return NextResponse.json({
+                success: true,
+                session
+            });
+        }
     } catch (error) {
         console.error('Error in /api/scheduled-sessions (POST):', error);
         return NextResponse.json(

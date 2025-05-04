@@ -2,12 +2,14 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import HelpButton from '../components/guided-help/HelpButton';
 
 export default function SetupProfile() {
     const [username, setUsername] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [showHelp, setShowHelp] = useState(false);
 
     const router = useRouter();
 
@@ -69,8 +71,9 @@ export default function SetupProfile() {
             const data = await response.json();
 
             if (data.success) {
-                // Redirect to calendar
+                // Show help guide instead of immediately redirecting
                 router.push('/calendar');
+                setShowHelp(true);
             } else {
                 setError(data.error || 'Failed to update profile');
             }
@@ -80,10 +83,19 @@ export default function SetupProfile() {
         }
     };
 
+    // Handle help completion - redirect to calendar
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+            </div>
+        );
+    }
+
+    if (showHelp) {
+        return (
+            <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+                <HelpButton onboardingMode={true} />
             </div>
         );
     }

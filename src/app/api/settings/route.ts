@@ -5,7 +5,7 @@ import dbConnect from '@/lib/mongodb';
 import Setting from '@/models/Setting';
 import User from '@/models/User';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         // Connect to the database
         await dbConnect();

@@ -195,7 +195,7 @@ export async function PUT(
 
         // Add campaign to new users
         if (users) {
-            const addedUsers = users.filter((user: any) => !previousUsers.includes(user));
+            const addedUsers = users.filter((user: never) => !previousUsers.includes(user));
 
             for (const user of addedUsers) {
                 await User.findOneAndUpdate(
@@ -205,7 +205,7 @@ export async function PUT(
             }
 
             // Remove campaign from users no longer in the list
-            const removedUsers = previousUsers.filter((user: any) => !users.includes(user));
+            const removedUsers = previousUsers.filter((user: never) => !users.includes(user));
 
             for (const user of removedUsers) {
                 await User.findOneAndUpdate(

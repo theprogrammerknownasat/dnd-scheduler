@@ -1,13 +1,15 @@
-// src/app/components/Header.tsx
-"use client";
+// src/app/components/Header.tsx with tutorial integration
+import React from 'react';
+import HelpButton from './guided-help/HelpButton';
 import { useRouter } from 'next/navigation';
 
 interface HeaderProps {
     username: string;
-    isAdmin: boolean;
+    isAdmin?: boolean;
+    children?: React.ReactNode;
 }
 
-export default function Header({ username, isAdmin }: HeaderProps) {
+const Header: React.FC<HeaderProps> = ({ username, isAdmin = false}) => {
     const router = useRouter();
 
     const handleLogout = async () => {
@@ -33,10 +35,13 @@ export default function Header({ username, isAdmin }: HeaderProps) {
                     >
                         DnD Scheduler
                     </h1>
+                    <div className="flex items-center px-10">
+                        <HelpButton/>
+                    </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center mt-2 sm:mt-0">
-                    <span className="mr-0 sm:mr-4 mb-2 sm:mb-0">
+                    <span className="mr-0 sm:mr-4 mb-2 sm:mb-0 text-gray-300 px-5">
                         Welcome, {username}
                     </span>
                     <div className="flex space-x-2">
@@ -74,4 +79,6 @@ export default function Header({ username, isAdmin }: HeaderProps) {
             </div>
         </header>
     );
-}
+};
+
+export default Header;

@@ -2,9 +2,24 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Simple update function that doesn't require MongoDB
+function updateActiveUser(username: string) {
+    // Make a fetch request to our API route
+    // We're using a non-blocking approach to avoid delaying the response
+    fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/admin/active-users/update?username=${encodeURIComponent(username)}`, {
+        method: 'GET',
+        headers: {
+            'Cache-Control': 'no-cache',
+        },
+    }).catch(error => {
+        console.error("Error updating active user:", error);
+    });
+}
+
 export async function middleware(request: NextRequest) {
     const currentUser = request.cookies.get('user')?.value;
     const isAdmin = request.cookies.get('isAdmin')?.value === 'true';
+    const username = request.cookies.get('username')?.value;
 
     // Define public paths that don't require authentication
     const publicPaths = ['/login'];
@@ -24,9 +39,8 @@ export async function middleware(request: NextRequest) {
     const isPublicPath = publicPaths.some(pp => path.startsWith(pp));
 
     // Check if the path is allowed during setup
-    const isSetupAllowedPath = setupAllowedPaths.some(sp => path.startsWith(sp));
-
-    // If the user is trying to access a protected route without being logged in
+    setupAllowedPaths.some(sp => path.startsWith(sp));
+// If the user is trying to access a protected route without being logged in
     if (!currentUser && !isPublicPath) {
         return NextResponse.redirect(new URL('/login', request.url));
     }
@@ -39,6 +53,16 @@ export async function middleware(request: NextRequest) {
     // If the user is logged in and trying to access the login page
     if (currentUser && isPublicPath) {
         return NextResponse.redirect(new URL('/calendar', request.url));
+    }
+
+    // Track active user if logged in
+    if (username) {
+        try {
+            // Use a simplified approach that's Edge compatible
+            updateActiveUser(username);
+        } catch (error) {
+            console.error("Error updating active user:", error);
+        }
     }
 
     return NextResponse.next();

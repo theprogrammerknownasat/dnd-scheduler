@@ -7,7 +7,6 @@ import User from '@/models/User';
 export async function GET() {
     try {
         const cookieStore = await cookies();
-        const username = cookieStore.get('user')?.value;
         const isAdmin = cookieStore.get('isAdmin')?.value === 'true';
 
         if (!isAdmin) {
