@@ -25,7 +25,7 @@ const ContactAdminButton = () => {
             } else {
                 setError(data.error || 'Failed to contact admin');
             }
-        } catch (err) {
+        } catch {
             setError('An error occurred');
         } finally {
             setIsLoading(false);

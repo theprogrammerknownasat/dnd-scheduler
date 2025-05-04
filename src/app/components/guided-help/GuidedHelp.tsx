@@ -19,7 +19,6 @@ interface GuidedHelpProps {
 }
 
 const GuidedHelp: React.FC<GuidedHelpProps> = ({ onClose, showCloseButton = true }) => {
-    const [currentStep, setCurrentStep] = useState(0);
     const [isDesktop, setIsDesktop] = useState(true);
     const [filteredSteps, setFilteredSteps] = useState<GuideStep[]>([]);
     const [filteredStepIndex, setFilteredStepIndex] = useState(0);

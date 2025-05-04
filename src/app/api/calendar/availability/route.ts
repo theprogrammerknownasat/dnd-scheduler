@@ -1,7 +1,7 @@
 // src/app/api/calendar/availability/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { parseISO, addDays, format } from 'date-fns';
+import { parseISO, format } from 'date-fns';
 import dbConnect from '@/lib/mongodb';
 import Availability from '@/models/Availability';
 

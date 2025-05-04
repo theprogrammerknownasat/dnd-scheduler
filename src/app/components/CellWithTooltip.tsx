@@ -1,6 +1,6 @@
 // src/app/components/CellWithTooltip.tsx
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 
 interface CellWithTooltipProps {

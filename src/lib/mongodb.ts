@@ -1,7 +1,7 @@
 // src/lib/mongodb.ts
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/dnd-scheduler';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 // Global is used here to maintain a cached connection across hot reloads
 // in development. This prevents connections growing exponentially
@@ -13,6 +13,10 @@ if (!cached) {
 }
 
 async function dbConnect() {
+
+    if (!MONGODB_URI) {
+        throw new Error('Please add your Mongo URI to .env.local');
+    }
     if (cached.conn) {
         return cached.conn;
     }

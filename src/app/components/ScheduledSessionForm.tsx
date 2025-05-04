@@ -1,7 +1,7 @@
 // src/app/components/ScheduledSessionForm.tsx
 "use client";
 import { useState, useEffect, useRef } from 'react';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, getDay, addDays, isSameMonth, isSameDay, parseISO, isToday } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, getDay, addDays, isSameMonth, isSameDay, isToday } from 'date-fns';
 import { formatTime } from '@/utils/dateTimeFormatter';
 
 interface ScheduledSessionFormProps {

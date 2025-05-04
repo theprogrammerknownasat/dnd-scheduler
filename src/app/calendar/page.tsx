@@ -59,66 +59,16 @@ export default function Calendar() {
     const [maxWeeks, setMaxWeeks] = useState(12); // Default to 12 weeks
     const [loading, setLoading] = useState(true);
     const [currentCampaignId, setCurrentCampaignId] = useState('');
-    const [availableCampaigns, setAvailableCampaigns] = useState<any[]>([]);
+    const [, setAvailableCampaigns] = useState<any[]>([]);
     const [scheduledSessions, setScheduledSessions] = useState<ScheduledSession[]>([]);
     const [showScheduleForm, setShowScheduleForm] = useState(false);
     const [scheduleDate, setScheduleDate] = useState<Date | null>(null);
     const [timeFormat, setTimeFormat] = useState<'12h' | '24h'>(getUserTimeFormat());
-    const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
-    const [isLoadingScheduledSessions, setIsLoadingScheduledSessions] = useState(false);
-    const [lastFetchTimestamp, setLastFetchTimestamp] = useState(0);
-    const [campaignDataVersion, setCampaignDataVersion] = useState(0);
+    const [campaignDataVersion, ] = useState(0);
 
 
     const router = useRouter();
 
-    // Toggle time format between 12h and 24h
-    const toggleTimeFormat = () => {
-        const newFormat = timeFormat === '12h' ? '24h' : '12h';
-        setTimeFormat(newFormat);
-        setUserTimeFormat(newFormat);
-    };
-
-    const debouncedFetchAllUsersAvailability = useCallback(
-        debounce(async (startDate: string, endDate: string) => {
-            try {
-                if (!currentCampaignId) return;
-
-                console.log(`Fetching all users availability for campaign: ${currentCampaignId}`);
-
-                const response = await fetch(`/api/calendar/all-availability?campaignId=${currentCampaignId}&start=${startDate}&end=${endDate}`);
-                const data = await response.json();
-
-                if (data.success) {
-                    setAllUsersAvailability(data.availability);
-                }
-            } catch (err) {
-                console.error('Error fetching all users availability:', err);
-            }
-        }, 500), // 500ms debounce
-        [currentCampaignId] // Re-create when campaignId changes
-    );
-
-// Debounced version of fetchScheduledSessions
-    const debouncedFetchScheduledSessions = useCallback(
-        debounce(async (startDate: string, endDate: string) => {
-            try {
-                if (!currentCampaignId) return;
-
-                console.log(`Fetching scheduled sessions for campaign: ${currentCampaignId}`);
-
-                const response = await fetch(`/api/scheduled-sessions?campaignId=${currentCampaignId}&start=${startDate}&end=${endDate}`);
-                const data = await response.json();
-
-                if (data.success) {
-                    setScheduledSessions(data.sessions);
-                }
-            } catch (err) {
-                console.error('Error fetching scheduled sessions:', err);
-            }
-        }, 500), // 500ms debounce
-        [currentCampaignId] // Re-create when campaignId changes
-    );
 
     const [userPreferences, setUserPreferences] = useState({
         maxPreviousSessions: 3,
@@ -324,7 +274,7 @@ export default function Calendar() {
 
             console.log(`Fetching scheduled sessions for campaign: ${currentCampaignId}`);
 
-            let url = `/api/scheduled-sessions?campaignId=${currentCampaignId}`;
+            const url = `/api/scheduled-sessions?campaignId=${currentCampaignId}`;
 
 
             const response = await fetch(url);
@@ -471,9 +421,7 @@ export default function Calendar() {
 
         fetchUserProfile();
     }, []);
-
-    const memoizedCampaignId = React.useMemo(() => currentCampaignId, [currentCampaignId]);
-
+    React.useMemo(() => currentCampaignId, [currentCampaignId]);
     const getAnnouncementClasses = () => {
         const baseClasses = "border-l-4 p-4 mb-4 rounded";
 

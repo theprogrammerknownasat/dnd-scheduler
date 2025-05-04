@@ -12,7 +12,7 @@ const HelpButton: React.FC<HelpButtonProps> = ({
                                                    onboardingMode = false
                                                }) => {
     const [showGuide, setShowGuide] = useState(false);
-    const [isFirstVisit, setIsFirstVisit] = useState(false);
+    const [, setIsFirstVisit] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
     const [showContactConfirmation, setShowContactConfirmation] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -63,7 +63,7 @@ const HelpButton: React.FC<HelpButtonProps> = ({
             } else {
                 setError(data.error || 'Failed to contact admin');
             }
-        } catch (err) {
+        } catch {
             setError('An error occurred');
         } finally {
             setIsLoading(false);

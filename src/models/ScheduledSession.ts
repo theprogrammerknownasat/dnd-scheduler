@@ -1,5 +1,5 @@
 // src/models/ScheduledSession.ts
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Document } from 'mongoose';
 
 export interface IScheduledSession extends Document {
     campaignId: string;

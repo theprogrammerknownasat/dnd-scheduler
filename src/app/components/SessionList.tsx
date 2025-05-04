@@ -1,7 +1,7 @@
 // src/app/components/SessionList.tsx
 "use client";
 import React, { useState, useEffect } from 'react';
-import { format, isAfter, isBefore, isEqual, startOfDay, endOfDay } from 'date-fns';
+import { format, isAfter, isBefore, isEqual } from 'date-fns';
 import { formatTime } from '@/utils/dateTimeFormatter';
 
 interface ScheduledSession {

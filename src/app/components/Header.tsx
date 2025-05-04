@@ -1,5 +1,5 @@
 // src/app/components/Header.tsx with tutorial integration
-import React, { useState } from 'react';
+import React from 'react';
 import HelpButton from './guided-help/HelpButton';
 import { useRouter } from 'next/navigation';
 
@@ -9,7 +9,7 @@ interface HeaderProps {
     children?: React.ReactNode;
 }
 
-const Header: React.FC<HeaderProps> = ({ username, isAdmin = false, children }) => {
+const Header: React.FC<HeaderProps> = ({ username, isAdmin = false}) => {
     const router = useRouter();
 
     const handleLogout = async () => {

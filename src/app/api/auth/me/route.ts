@@ -1,16 +1,14 @@
 // src/app/api/auth/me/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import User from '@/models/User';
 import dbConnect from '@/lib/mongodb';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         // Get cookies
         const cookieStore = await cookies();
         const username = cookieStore.get('user')?.value;
-        const isAdmin = cookieStore.get('isAdmin')?.value === 'true';
-
         if (!username) {
             return NextResponse.json({
                 success: false,

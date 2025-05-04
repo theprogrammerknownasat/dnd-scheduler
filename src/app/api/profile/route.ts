@@ -6,7 +6,7 @@ import User from '@/models/User';
 import Setting from '@/models/Setting';
 import bcrypt from 'bcrypt';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         // Get the username from cookies
         const cookieStore = await cookies();

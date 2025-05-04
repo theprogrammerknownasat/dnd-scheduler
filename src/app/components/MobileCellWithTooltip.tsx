@@ -1,7 +1,7 @@
 // MobileCellWithTooltip.tsx
 // Add data attributes for time indicator
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { format } from 'date-fns';
 
 interface MobileCellWithTooltipProps {
@@ -41,7 +41,7 @@ const MobileCellWithTooltip: React.FC<MobileCellWithTooltipProps> = ({
                                                                          unavailableUsers,
                                                                          displayTime
                                                                      }) => {
-    const [showTooltip, setShowTooltip] = useState(false);
+    const [showTooltip] = useState(false);
     const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
     const key = `${dateStr}-${hour}`;
     const isTooltipShowingRef = useRef<boolean>(false);

@@ -39,9 +39,8 @@ export async function middleware(request: NextRequest) {
     const isPublicPath = publicPaths.some(pp => path.startsWith(pp));
 
     // Check if the path is allowed during setup
-    const isSetupAllowedPath = setupAllowedPaths.some(sp => path.startsWith(sp));
-
-    // If the user is trying to access a protected route without being logged in
+    setupAllowedPaths.some(sp => path.startsWith(sp));
+// If the user is trying to access a protected route without being logged in
     if (!currentUser && !isPublicPath) {
         return NextResponse.redirect(new URL('/login', request.url));
     }

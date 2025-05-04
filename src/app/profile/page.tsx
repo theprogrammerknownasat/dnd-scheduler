@@ -98,35 +98,7 @@ export default function Profile() {
 
         fetchProfile();
     }, [router]);
-
-    const handleUpdateSessionDisplay = async () => {
-        try {
-            setError('');
-            setSuccess('');
-
-            const response = await fetch('/api/profile', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    maxPreviousSessions: sessionDisplay.maxPreviousSessions,
-                    maxFutureSessions: sessionDisplay.maxFutureSessions
-                }),
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                setSuccess('Session display preferences updated successfully!');
-            } else {
-                setError(data.error || 'Failed to update session display preferences');
-            }
-        } catch (err) {
-            console.error('Error updating session display preferences:', err);
-            setError('An error occurred. Please try again.');
-        }
-    };
-
-    // Handle display name update
+// Handle display name update
     const handleUpdateDisplayName = async () => {
         try {
             setError('');

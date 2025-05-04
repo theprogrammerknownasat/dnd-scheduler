@@ -2,7 +2,7 @@
 
 // 1. Update the component for better session visibility
 import React, { useState, useEffect, useRef } from 'react';
-import { isToday, format, isSameDay } from 'date-fns';
+import { isToday, format } from 'date-fns';
 
 interface TimeSlotCellProps {
     day: Date;
