@@ -48,10 +48,46 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
     const key = `${dateStr}-${hour}`;
     const cellRef = useRef<HTMLDivElement>(null);
     const isFullAvailability = count === total && count > 0;
+    const [, setTooltipPosition] = useState<'top' | 'bottom'>('top');
+    const [, setTooltipStyle] = useState<React.CSSProperties>({ left: '50%', top: '-120%' });
+    const truncateText = (text: string, maxLength: number): string => {
+        if (text.length <= maxLength) return text;
+        return text.slice(0, maxLength - 3) + '...';
+    };
 
-    // Log session info for debugging
+    const calculateTooltipPosition = () => {
+        if (cellRef.current) {
+            const cellRect = cellRef.current.getBoundingClientRect();
+            const cellTop = cellRect.top;
+            const windowHeight = window.innerHeight;
 
-    // Tooltip functions with delays adjusted for better usability
+            // Switch to bottom tooltip 3 rows earlier than before
+            // Assuming 40px per row height (adjust based on your actual cell height)
+            const threeRowsHeight = 40 * 3;
+            const threshold = (windowHeight / 2) - threeRowsHeight;
+
+            console.log('Cell top:', cellTop, 'Threshold:', threshold);
+            const shouldBeBelow = cellTop < threshold;
+
+            setTooltipPosition(shouldBeBelow ? 'bottom' : 'top');
+
+            if (shouldBeBelow) {
+                setTooltipStyle({
+                    left: '50%',
+                    top: '100%',
+                    transform: 'translateX(-50%)',
+                    marginTop: '8px'
+                });
+            } else {
+                setTooltipStyle({
+                    left: '50%',
+                    top: '-110%',
+                    transform: 'translateX(-50%)'
+                });
+            }
+        }
+    };
+// Tooltip functions with delays adjusted for better usability
     const handleMouseEnterWithTooltip = () => {
         if (isPast) return;
 
@@ -108,6 +144,12 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
         };
     }, [longPressTimer]);
 
+    useEffect(() => {
+        if (showTooltip) {
+            calculateTooltipPosition();
+        }
+    }, [showTooltip]);
+
 
     // Get available/unavailable users for tooltip
     const {availableUsers, unavailableUsers} = getAvailableUsers(day, hour);
@@ -124,7 +166,7 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
             data-full-availability={isFullAvailability ? 'true' : 'false'}
             className={`p-3 border-b border-r border-gray-200 dark:border-gray-600 text-center relative
                 ${!isPast ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}
-                ${isToday(day) ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}
+                ${isToday(day) && !availabilityColor ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}
                 ${availabilityColor}
                 ${sessionHighlight}
                 ${isFullAvailability ? '!bg-green-700 dark:!bg-green-800' : ''}
@@ -155,7 +197,7 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
                 {/* Make session title more visible */}
                 {session && (
                     <span className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1 truncate max-w-full">
-                        {session.title}
+                        {truncateText(session.title, 20)}
                     </span>
                 )}
             </div>
@@ -163,37 +205,89 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
             {/* Enhanced session tooltip */}
             {showTooltip && (
                 <div
-                    className="absolute z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 w-64 transition-opacity"
+                    className="fixed z-[9999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 w-64"
                     style={{
-                        left: '50%',
-                        top: '-120%',
-                        transform: 'translateX(-50%)'
+                        // Use getBoundingClientRect() for precise positioning
+                        left: (() => {
+                            if (!cellRef.current) return '50%';
+                            const rect = cellRef.current.getBoundingClientRect();
+                            const tooltipWidth = 256; // 16rem = 256px
+                            const centerX = rect.left + rect.width / 2;
+                            const leftPosition = centerX - tooltipWidth / 2;
+                            // Prevent overflow
+                            const maxLeft = window.innerWidth - tooltipWidth - 10;
+                            return `${Math.max(10, Math.min(leftPosition, maxLeft))}px`;
+                        })(),
+                        top: (() => {
+                            if (!cellRef.current) return 'auto';
+                            const rect = cellRef.current.getBoundingClientRect();
+                            const tooltipHeight = 200; // Approximate height
+                            const gapSize = 8; // Gap between cell and tooltip
+
+                            // Check if tooltip would overflow bottom
+                            if (rect.bottom + tooltipHeight + gapSize > window.innerHeight) {
+                                // Place above the cell
+                                return `${rect.top - tooltipHeight - gapSize}px`;
+                            } else {
+                                // Place below the cell
+                                return `${rect.bottom + gapSize}px`;
+                            }
+                        })(),
+                        pointerEvents: 'none'
                     }}
                 >
-                    {/* Arrow pointing to the cell */}
+                    {/* Simple arrow that's always centered on the cell */}
                     <div
-                        className="absolute w-3 h-3 bg-white dark:bg-gray-800 transform rotate-45"
+                        className="absolute w-3 h-3 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700"
                         style={{
-                            bottom: '-6px',
-                            left: 'calc(50% - 6px)'
+                            left: '50%',
+                            transform: `translateX(-50%) rotate(45deg)`,
+                            top: (() => {
+                                if (!cellRef.current) return '-6px';
+                                const rect = cellRef.current.getBoundingClientRect();
+
+                                // Check if tooltip is above or below the cell
+                                if (rect.top > window.innerHeight / 2) {
+                                    // Tooltip is above cell
+                                    return 'auto';
+                                } else {
+                                    // Tooltip is below cell
+                                    return '-6px';
+                                }
+                            })(),
+                            bottom: (() => {
+                                if (!cellRef.current) return 'auto';
+                                const rect = cellRef.current.getBoundingClientRect();
+
+                                // Check if tooltip is above or below the cell
+                                if (rect.top <= window.innerHeight / 2) {
+                                    // Tooltip is below cell
+                                    return 'auto';
+                                } else {
+                                    // Tooltip is above cell
+                                    return '-6px';
+                                }
+                            })()
                         }}
                     />
 
+                    {/* Tooltip content */}
                     <div className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                         {format(day, 'EEE, MMM d')} at {displayTime(hour)}
                     </div>
 
-                    {/* Display session info if there's a session */}
                     {session && (
                         <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500 rounded">
                             <div className="font-medium text-blue-700 dark:text-blue-300">
-                                Scheduled Session: {session.title}
+                                Scheduled Session: {truncateText(session.title, 20)}
                             </div>
                             <div className="text-xs text-blue-600 dark:text-blue-400">
                                 {displayTime(session.startTime)} - {displayTime(session.endTime)}
                             </div>
                             {session.notes && (
-                                <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">{session.notes}</div>
+                                <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                    {truncateText(session.notes, 50)}
+                                </div>
                             )}
                         </div>
                     )}
@@ -216,8 +310,7 @@ const TimeSlotCell: React.FC<TimeSlotCellProps> = ({
                         </div>
 
                         <div>
-                            <h4 className="font-medium text-red-600 dark:text-red-400">Unavailable
-                                ({total - count})</h4>
+                            <h4 className="font-medium text-red-600 dark:text-red-400">Unavailable ({total - count})</h4>
                             {total - count > 0 ? (
                                 <ul className="text-gray-600 dark:text-gray-400 space-y-1 mt-1">
                                     {unavailableUsers.map(name => (

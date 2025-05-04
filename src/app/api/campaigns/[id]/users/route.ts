@@ -8,11 +8,11 @@ import User from '@/models/User';
 // Get all users for a campaign
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         // Make sure to await params.id
-        const id = params.id;
+        const { id } = await params;
         const cookieStore = await cookies();
         const username = cookieStore.get('user')?.value;
 

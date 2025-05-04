@@ -18,6 +18,204 @@ interface GuidedHelpProps {
     showCloseButton?: boolean;
 }
 
+const guideSteps: GuideStep[] = [
+    {
+        id: 'welcome',
+        title: "Welcome to DnD Scheduler!",
+        content: [
+            "This app helps your D&D group coordinate game sessions by finding times when everyone is available.",
+            "This guide will show you how to use the key features of the app."
+        ],
+        // Both mobile and desktop see this
+    },
+    {
+        id: 'calendar-basics',
+        title: "Calendar Overview",
+        content: [
+            "The calendar shows days and time slots.",
+            "On mobile, tap a day to expand it and see the time slots.",
+            "Tap the date at the top to see a dropdown to change the week."
+        ],
+        image: "/images/help/mobile/calendar-overview.gif",
+        mobileFocus: true
+    },
+    {
+        id: 'calendar-basics-desktop',
+        title: "Calendar Navigation",
+        content: [
+            "Use the arrow buttons to navigate between weeks.",
+            "Click on the date range to open a calendar picker for quick navigation.",
+            "Click 'Today' to return to the current week.",
+            "Use the zoom controls to view 2 weeks or 1 week at a time."
+        ],
+        image: "/images/help/desktop/calendar-navigation-desktop.gif",
+        desktopFocus: true
+    },
+    {
+        id: 'mark-availability',
+        title: "Marking Your Availability",
+        content: [
+            "Tap on a time slot to mark yourself as available (green checkmark).",
+            "Tap again to mark yourself as unavailable (empty circle).",
+            "This helps your DM know when you can play."
+        ],
+        image: "/images/help/mobile/mark-availability.gif",
+        mobileFocus: true
+    },
+    {
+        id: 'mark-availability-desktop',
+        title: "Quick Availability Selection",
+        content: [
+            "Click a time slot to mark yourself as available (green checkmark).",
+            "Click again to toggle back to unavailable.",
+            "Drag to quickly mark multiple time slots at once.",
+            "Drag from available to unavailable or vice versa to quickly change multiple slots."
+        ],
+        image: "/images/help/desktop/mark-availability-desktop.gif",
+        desktopFocus: true,
+    },
+    {
+        id: 'availability-counts',
+        title: "Understanding Availability",
+        content: [
+            "Each time slot shows how many players are available.",
+            "The format is 'Available Players / Total Players' (e.g., 3/5).",
+            "Greener colors indicate more player availability.",
+            "Blue indicates a scheduled session."
+        ],
+        image: "/images/help/availability-counts.png",
+        // Works for both mobile and desktop
+    },
+    {
+        id: 'time-slot-details',
+        title: "Time Slot Details",
+        content: [
+            "Tap and hold on a time slot to see exactly who is available.",
+            "This shows which players can make that time and which can't.",
+            "It's helpful when planning specific sessions."
+        ],
+        image: "/images/help/mobile/details.gif",
+        mobileFocus: true
+    },
+    {
+        id: 'time-slot-details-desktop',
+        title: "Time Slot Information",
+        content: [
+            "Hover over a time slot to see a tooltip with availability details.",
+            "The tooltip shows who is available and who isn't.",
+            "Click a time slot to see detailed availability information in the right panel."
+        ],
+        image: "/images/help/desktop/time-slot-details-desktop.png",
+        desktopFocus: true
+    },
+    {
+        id: 'scheduled-sessions',
+        title: "Scheduled Sessions",
+        content: [
+            "Scheduled game sessions appear below the calendar.",
+            "Sessions are sorted by date with upcoming sessions at the top.",
+            "Open a session to see its full details."
+        ],
+        image: "/images/help/scheduled-sessions.png",
+        // Works for both mobile and desktop
+    },
+    {
+        id: 'sessions-in-calendar',
+        title: "Sessions in Calendar",
+        content: [
+            "Scheduled sessions also appear in the calendar with a blue border.",
+            "These time slots show the session title.",
+            "You can tap (and hold) them to see session details."
+        ],
+        mobileFocus: true
+    },
+    {
+        id: 'sessions-in-calendar-desktop',
+        title: "Session Indicators",
+        content: [
+            "Scheduled sessions appear with a blue border and background in the calendar.",
+            "Sessions in progress are highlighted in green with an 'In Progress' tag.",
+            "Hover over a session to see quick details in the tooltip."
+        ],
+        desktopFocus: true
+    },
+    {
+        id: 'current-time-indicator',
+        title: "Current Time Marker",
+        content: [
+            "A red line shows the current time in today's column.",
+            "This helps you quickly see if a session is currently in progress.",
+            "The indicator updates automatically to show the current time."
+        ],
+        desktopFocus: true
+    },
+    {
+        id: 'polls',
+        title: "Voting on Polls",
+        content: [
+            "Polls appear at the bottom of the page.",
+            "You can vote on group decisions like adventure choices or house rules.",
+            "Some polls show results immediately, others hide results until voting ends."
+        ],
+        image: "/images/help/polls.png",
+        // Works for both mobile and desktop
+    },
+    {
+        id: 'announcements',
+        title: "Campaign Announcements",
+        content: [
+            "Announcements appear at the top of the calendar page.",
+            "Different colors indicate different types of announcements.",
+            "These are used for important campaign updates from your DM."
+        ],
+        image: "/images/help/announcement.png",
+        // Works for both mobile and desktop
+    },
+    {
+        id: 'campaign-switcher',
+        title: "Switching Campaigns",
+        content: [
+            "If you play in multiple campaigns, use the dropdown to switch between them.",
+            "Your availability is tracked separately for each campaign.",
+            "This appears at the top of the calendar page."
+        ],
+        // Works for both mobile and desktop
+    },
+    {
+        id: 'profile',
+        title: "Your Profile",
+        content: [
+            "Tap your username in the top right to access your profile.",
+            "Here you can change your display name and preferences.",
+            "You can also set your time format (12h or 24h)."
+        ],
+        image: "/images/help/mobile/profile.gif",
+        mobileFocus: true
+    },
+    {
+        id: 'profile-desktop',
+        title: "Profile Settings",
+        content: [
+            "Click your username in the top right corner to open your profile.",
+            "Update your display name, time format preferences, and other settings.",
+            "Changes are saved automatically when you leave the profile page."
+        ],
+        image: "/images/help/desktop/profile.gif",
+        desktopFocus: true
+    },
+    {
+        id: 'get-help',
+        title: "Need More Help?",
+        content: [
+            "Click/tap the Help button in the header anytime to see this guide again.",
+            "Use the dropdown in the help menu to contact admin or restart the tutorial.",
+            "If you have specific issues, contact your campaign's DM.",
+            "Thanks for using DnD Scheduler!"
+        ],
+        // Works for both mobile and desktop
+    }
+];
+
 const GuidedHelp: React.FC<GuidedHelpProps> = ({ onClose, showCloseButton = true }) => {
     const [isDesktop, setIsDesktop] = useState(true);
     const [filteredSteps, setFilteredSteps] = useState<GuideStep[]>([]);
@@ -34,209 +232,6 @@ const GuidedHelp: React.FC<GuidedHelpProps> = ({ onClose, showCloseButton = true
         window.addEventListener('resize', checkDeviceType);
         return () => window.removeEventListener('resize', checkDeviceType);
     }, []);
-
-    // Define the guide steps, focusing on mobile experience
-    const guideSteps: GuideStep[] = [
-        {
-            id: 'welcome',
-            title: "Welcome to DnD Scheduler!",
-            content: [
-                "This app helps your D&D group coordinate game sessions by finding times when everyone is available.",
-                "This guide will show you how to use the key features of the app."
-            ],
-            // Both mobile and desktop see this
-        },
-        {
-            id: 'calendar-basics',
-            title: "Calendar Overview",
-            content: [
-                "The calendar shows days and time slots.",
-                "On mobile, tap a day to expand it and see the time slots.",
-                "Tap the date at the top to see a dropdown to change the week."
-            ],
-            image: "/public/images/help/mobile/calendar-overview.jpg",
-            mobileFocus: true
-        },
-        {
-            id: 'calendar-basics-desktop',
-            title: "Calendar Navigation",
-            content: [
-                "Use the arrow buttons to navigate between weeks.",
-                "Click on the date range to open a calendar picker for quick navigation.",
-                "Click 'Today' to return to the current week.",
-                "Use the zoom controls to view 2 weeks or 1 week at a time."
-            ],
-            image: "/public/images/help/desktop/calendar-navigation-desktop.jpg",
-            desktopFocus: true
-        },
-        {
-            id: 'mark-availability',
-            title: "Marking Your Availability",
-            content: [
-                "Tap on a time slot to mark yourself as available (green checkmark).",
-                "Tap again to mark yourself as unavailable (empty circle).",
-                "This helps your DM know when you can play."
-            ],
-            image: "/public/images/help/mobile/mark-availability.jpg",
-            mobileFocus: true
-        },
-        {
-            id: 'mark-availability-desktop',
-            title: "Quick Availability Selection",
-            content: [
-                "Click a time slot to mark yourself as available (green checkmark).",
-                "Click again to toggle back to unavailable.",
-                "Drag to quickly mark multiple time slots at once.",
-                "Drag from available to unavailable or vice versa to quickly change multiple slots."
-            ],
-            image: "/public/images/help/desktop/mark-availability-desktop.jpg",
-            desktopFocus: true,
-        },
-        {
-            id: 'availability-counts',
-            title: "Understanding Availability",
-            content: [
-                "Each time slot shows how many players are available.",
-                "The format is 'Available Players / Total Players' (e.g., 3/5).",
-                "Greener colors indicate more player availability.",
-                "Blue indicates a scheduled session."
-            ],
-            image: "/public/images/help/availability-counts.jpg",
-            // Works for both mobile and desktop
-        },
-        {
-            id: 'time-slot-details',
-            title: "Time Slot Details",
-            content: [
-                "Tap and hold on a time slot to see exactly who is available.",
-                "This shows which players can make that time and which can't.",
-                "It's helpful when planning specific sessions."
-            ],
-            image: "/public/images/help/time-slot-details.jpg",
-            mobileFocus: true
-        },
-        {
-            id: 'time-slot-details-desktop',
-            title: "Time Slot Information",
-            content: [
-                "Hover over a time slot to see a tooltip with availability details.",
-                "The tooltip shows who is available and who isn't.",
-                "Click a time slot to see detailed availability information in the right panel."
-            ],
-            image: "/public/images/help/time-slot-details-desktop.jpg",
-            desktopFocus: true
-        },
-        {
-            id: 'scheduled-sessions',
-            title: "Scheduled Sessions",
-            content: [
-                "Scheduled game sessions appear below the calendar.",
-                "Sessions are sorted by date with upcoming sessions at the top.",
-                "Tap a session to see its full details."
-            ],
-            image: "/public/images/help/scheduled-sessions.jpg",
-            // Works for both mobile and desktop
-        },
-        {
-            id: 'sessions-in-calendar',
-            title: "Sessions in Calendar",
-            content: [
-                "Scheduled sessions also appear in the calendar with a blue border.",
-                "These time slots show the session title.",
-                "You can tap them to see session details."
-            ],
-            image: "/public/images/help/sessions-in-calendar.jpg",
-            mobileFocus: true
-        },
-        {
-            id: 'sessions-in-calendar-desktop',
-            title: "Session Indicators",
-            content: [
-                "Scheduled sessions appear with a blue border and background in the calendar.",
-                "Sessions in progress are highlighted in green with an 'In Progress' tag.",
-                "Hover over a session to see quick details in the tooltip."
-            ],
-            image: "/public/images/help/sessions-in-calendar-desktop.jpg",
-            desktopFocus: true
-        },
-        {
-            id: 'current-time-indicator',
-            title: "Current Time Marker",
-            content: [
-                "A red line shows the current time in today's column.",
-                "This helps you quickly see if a session is currently in progress.",
-                "The indicator updates automatically to show the current time."
-            ],
-            image: "/public/images/help/current-time-indicator.jpg",
-            desktopFocus: true
-        },
-        {
-            id: 'polls',
-            title: "Voting on Polls",
-            content: [
-                "Polls appear at the bottom of the page.",
-                "You can vote on group decisions like adventure choices or house rules.",
-                "Some polls show results immediately, others hide results until voting ends."
-            ],
-            image: "/public/images/help/polls.jpg",
-            // Works for both mobile and desktop
-        },
-        {
-            id: 'announcements',
-            title: "Campaign Announcements",
-            content: [
-                "Announcements appear at the top of the calendar page.",
-                "Different colors indicate different types of announcements.",
-                "These are used for important campaign updates from your DM."
-            ],
-            image: "/public/images/help/announcements.jpg",
-            // Works for both mobile and desktop
-        },
-        {
-            id: 'campaign-switcher',
-            title: "Switching Campaigns",
-            content: [
-                "If you play in multiple campaigns, use the dropdown to switch between them.",
-                "Your availability is tracked separately for each campaign.",
-                "This appears at the top of the calendar page."
-            ],
-            image: "/public/images/help/campaign-switcher.jpg",
-            // Works for both mobile and desktop
-        },
-        {
-            id: 'profile',
-            title: "Your Profile",
-            content: [
-                "Tap your username in the top right to access your profile.",
-                "Here you can change your display name and preferences.",
-                "You can also set your time format (12h or 24h)."
-            ],
-            image: "/public/images/help/profile.jpg",
-            mobileFocus: true
-        },
-        {
-            id: 'profile-desktop',
-            title: "Profile Settings",
-            content: [
-                "Click your username in the top right corner to open your profile.",
-                "Update your display name, time format preferences, and other settings.",
-                "Changes are saved automatically when you leave the profile page."
-            ],
-            image: "/public/images/help/profile-desktop.jpg",
-            desktopFocus: true
-        },
-        {
-            id: 'get-help',
-            title: "Need More Help?",
-            content: [
-                "Click/tap the Help button in the header anytime to see this guide again.",
-                "Use the dropdown in the help menu to contact admin or restart the tutorial.",
-                "If you have specific issues, contact your campaign's DM.",
-                "Thanks for using DnD Scheduler!"
-            ],
-            // Works for both mobile and desktop
-        }
-    ];
 
     // Filter steps based on device type
     const getFilteredSteps = useCallback(() => {

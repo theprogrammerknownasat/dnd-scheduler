@@ -8,7 +8,7 @@ import Campaign from '@/models/Campaign';
 // Delete a scheduled session (admin only)
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const cookieStore = await cookies();
@@ -29,8 +29,8 @@ export async function DELETE(
             );
         }
 
-        const sessionId = params.id;
-        if (!sessionId) {
+        const { id } = await params;
+        if (!id) {
             return NextResponse.json(
                 { success: false, error: 'Session ID is required' },
                 { status: 400 }
@@ -58,7 +58,7 @@ export async function DELETE(
         }
 
         // Verify session belongs to this campaign
-        const session = await ScheduledSession.findById(sessionId);
+        const session = await ScheduledSession.findById(id);
         if (!session) {
             return NextResponse.json(
                 { success: false, error: 'Session not found' },
@@ -82,7 +82,7 @@ export async function DELETE(
             }).sort({ recurringIndex: 1 });
 
             // Check if this is the first session in the group
-            if (allSessions[0]._id.toString() === sessionId) {
+            if (allSessions[0]._id.toString() === id) {
                 // If it's the first session and we have at least one more in the group,
                 // create the next one in the sequence
                 if (allSessions.length < session.maxRecurrences) {
@@ -112,7 +112,7 @@ export async function DELETE(
         }
 
         // Delete session
-        await ScheduledSession.findByIdAndDelete(sessionId);
+        await ScheduledSession.findByIdAndDelete(id);
 
         return NextResponse.json({
             success: true,
@@ -129,7 +129,7 @@ export async function DELETE(
 
 export async function PUT(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const cookieStore = await cookies();
@@ -150,8 +150,8 @@ export async function PUT(
             );
         }
 
-        const sessionId = params.id;
-        if (!sessionId) {
+        const { id } = await params;
+        if (!id) {
             return NextResponse.json(
                 { success: false, error: 'Session ID is required' },
                 { status: 400 }
@@ -187,7 +187,7 @@ export async function PUT(
         }
 
         // Find and update session
-        const session = await ScheduledSession.findById(sessionId);
+        const session = await ScheduledSession.findById(id);
         if (!session) {
             return NextResponse.json(
                 { success: false, error: 'Session not found' },

@@ -119,10 +119,10 @@ export async function POST(request: Request) {
 // Update a campaign (admin only)
 export async function PUT(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = params.id;
+        const { id } = await params;
         const cookieStore = await cookies();
         const username = cookieStore.get('user')?.value;
         const isAdmin = cookieStore.get('isAdmin')?.value === 'true';
@@ -231,10 +231,10 @@ export async function PUT(
 // Delete a campaign (admin only)
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = params.id;
+        const { id } = await params;
         const cookieStore = await cookies();
         const username = cookieStore.get('user')?.value;
         const isAdmin = cookieStore.get('isAdmin')?.value === 'true';

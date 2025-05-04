@@ -409,7 +409,11 @@ export default function SessionList({
                             )}
                             {session.isRecurring && session.recurringGroupId && (
                                 <span className="ml-2 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 text-xs rounded-full">
-                                    Recurring {session.recurringIndex + 1}/{session.maxRecurrences}
+                                    {session.recurringIndex !== undefined && session.maxRecurrences !== undefined ? (
+                                        `Recurring ${session.recurringIndex + 1}/${session.maxRecurrences}`
+                                    ) : (
+                                        'Recurring Session'
+                                    )}
                                 </span>
                             )}
                         </h4>

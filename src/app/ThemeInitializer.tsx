@@ -30,6 +30,20 @@ const ThemeInitializer = () => {
         return () => mediaQuery.removeEventListener('change', handleChange);
     }, []);
 
+    // Initialize database on client-side only
+    useEffect(() => {
+        const initializeDatabase = async () => {
+            try {
+                const response = await fetch('/api/init', { cache: 'no-store' });
+                await response.json();
+            } catch (error) {
+                console.error('Failed to initialize database:', error);
+            }
+        };
+
+        initializeDatabase();
+    }, []);
+
     // This component doesn't render anything visible
     return null;
 };
